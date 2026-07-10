@@ -4,7 +4,7 @@ namespace Test\MissionBayReporting\MissionBay;
 
 use PHPUnit\Framework\TestCase;
 use MissionBayReporting\MissionBay\VizionCanvasAgentTool;
-use MissionBay\Api\IAgentContext;
+use AssistantFoundation\Api\IAgentContext;
 use DataHawk\Api\IReportExporterFactory;
 use DataHawk\Api\IReportExporter;
 use ResourceFoundation\Dto\QueryResult;

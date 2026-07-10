@@ -19,7 +19,7 @@ namespace MissionBayReporting\MissionBay;
 
 use MissionBay\Resource\AbstractAgentResource;
 use MissionBay\Api\IAgentTool;
-use MissionBay\Api\IAgentContext;
+use AssistantFoundation\Api\IAgentContext;
 use ResourceFoundation\Api\IQueryService;
 
 class DataHawkAgentTool extends AbstractAgentResource implements IAgentTool {

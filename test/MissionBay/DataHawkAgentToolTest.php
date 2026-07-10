@@ -4,7 +4,7 @@ namespace Test\MissionBayReporting\MissionBay;
 
 use PHPUnit\Framework\TestCase;
 use MissionBayReporting\MissionBay\DataHawkAgentTool;
-use MissionBay\Api\IAgentContext;
+use AssistantFoundation\Api\IAgentContext;
 use ResourceFoundation\Api\IQueryService;
 use ResourceFoundation\Dto\QueryResult;
 

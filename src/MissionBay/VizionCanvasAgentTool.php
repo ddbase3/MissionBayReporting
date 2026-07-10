@@ -19,7 +19,7 @@ namespace MissionBayReporting\MissionBay;
 
 use DataHawk\Api\IReportExporterFactory;
 use MissionBay\Api\IAgentTool;
-use MissionBay\Api\IAgentContext;
+use AssistantFoundation\Api\IAgentContext;
 use MissionBay\Resource\AbstractAgentResource;
 
 class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool {

@@ -151,8 +151,8 @@ MissionBayReporting does not replace MissionBay, DataHawk, or Vizion. It extends
 Based on the current implementation, MissionBayReporting depends on the following interfaces and systems:
 
 * `MissionBay\Api\IAgentTool`
-* `MissionBay\Api\IAgentMemory`
-* `MissionBay\Api\IAgentContext`
+* `AssistantFoundation\Api\IAgentMemory`
+* `AssistantFoundation\Api\IAgentContext`
 * `MissionBay\Api\IAgentConfigValueResolver`
 * `ResourceFoundation\Api\IQueryService`
 * `ResourceFoundation\Api\IQuerySchemaProvider`
