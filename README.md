@@ -1,207 +1,239 @@
 # MissionBayReporting
 
-**MissionBayReporting** extends MissionBay with reporting-oriented agent resources.
+## Purpose
 
-The DataHawk reporting tool is intentionally **on demand**: reporting schema metadata is not injected into every agent call. When a user asks a reporting question, the agent first discovers the relevant reporting tables and fields through the tool and then executes a read-only structured query.
+MissionBayReporting is a MissionBay extension package for reporting and visualization use cases.
 
-## DataHawkAgentTool
+Its primary current integration is `DataHawkAgentTool`, which exposes on-demand reporting schema discovery and read-only structured query execution through the neutral `ResourceFoundation` query contracts.
 
-`MissionBayReporting\MissionBay\DataHawkAgentTool` is one configurable MissionBay agent resource.
+The package also retains Vizion-oriented canvas resources and a DataHawk report node for installations that use the older/report-rendering flow path.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[MissionBay agent] --> T[DataHawkAgentTool]
+    T --> Q[ResourceFoundation IQueryService]
+    Q --> S[IQuerySchemaProvider / query backend]
+    T --> R[structured rows and metadata]
+
+    A --> V[VizionCanvasAgentTool]
+    V --> E[DataHawk IReportExporterFactory]
+    E --> C[canvas.open / canvas.render events]
+```
+
+The important current boundary is that `DataHawkAgentTool` does not depend on a concrete DataHawk query implementation for data access. It depends on:
+
+```text
+ResourceFoundation\Api\IQueryService
+```
+
+This keeps the agent tool reusable with any project implementation that fills the ResourceFoundation query slot.
+
+## Plugin initialization
+
+`MissionBayReportingPlugin::init()` only registers the plugin object itself.
+
+The reporting classes are discoverable through the BASE3 class map and are normally instantiated as MissionBay component presets or flow nodes. The plugin does not create a second service registry.
+
+## DataHawk agent tool
+
+Technical resource name:
+
+```text
+datahawkagenttool
+```
 
 It exposes two read-only functions:
 
-* `describe_reporting_data`
-* `execute_datahawk_query`
-
-The implementation depends on `ResourceFoundation\Api\IQueryService` for reporting data and schema metadata. It does not depend on DataHawk implementation classes for data access.
-
-### `describe_reporting_data`
-
-Use this operation when a reporting request requires schema knowledge.
-
-The operation can:
-
-* search available reporting tables by table metadata and field metadata,
-* return representative field names for each search candidate so the agent can choose a table without repeated discovery calls,
-* return full metadata for one exact table,
-* expose field names, aliases, types, descriptions and sensitivity markers,
-* expose available declared relations,
-* return the supported read-only DataHawk operators and functions,
-* return a small query example for the selected table.
-
-The search result is deliberately bounded. It does not return the complete reporting schema unless the configured scope is already very small.
-
-Example discovery call:
-
-```json
-{
-  "search": "user"
-}
+```text
+describe_reporting_data
+execute_datahawk_query
 ```
 
-After a candidate was found, the agent should request that exact table name once for full field metadata. It must not invent physical/source table names that were not returned by discovery:
+The intended usage is on demand:
 
-```json
-{
-  "table": "user_report_rows"
-}
+1. the agent receives a reporting question
+2. if schema is not already known from recent tool context, it calls `describe_reporting_data`
+3. it selects an exact table name returned by discovery
+4. it calls `execute_datahawk_query` with a structured SELECT object
+5. the tool returns rows, columns, sensitivity metadata and effective result limits
+
+The full reporting schema is not injected into every assistant call.
+
+See [docs/datahawk-agent-tool.md](docs/datahawk-agent-tool.md).
+
+## Read-only query boundary
+
+`DataHawkAgentTool` validates the structured query before it reaches `IQueryService`.
+
+Current allowed element types:
+
+```text
+fld
+fn
+op
+subquery
+case
+windowfn
 ```
 
-Search terms should describe schema concepts such as `user`, `course`, `certificate` or `learning progress`. Person names and other data values are not schema search terms.
+Only SELECT-style reporting queries are accepted. Write operations and unrestricted raw SQL are not part of the tool contract.
 
-### `execute_datahawk_query`
+See [docs/query-contract-and-security.md](docs/query-contract-and-security.md).
 
-Executes one structured read-only DataHawk SELECT query through `IQueryService`.
+## Component preset configuration
 
-The `query` argument must be a JSON object. JSON strings are not accepted.
+The tool implements `ISchemaProvider` and can be configured as a normal MissionBay component preset.
 
-Example:
+Supported settings:
+
+```text
+priority
+domainFilter
+categoryFilter
+tagFilter
+tableFilter
+describeLimit
+defaultLimit
+maxLimit
+```
+
+Current defaults:
+
+```text
+priority = 60
+describeLimit = 8
+maximum describeLimit = 20
+defaultLimit = 100
+maxLimit = 1000
+```
+
+If `defaultLimit` is configured above `maxLimit`, the runtime clamps the default to the hard maximum.
+
+All filter values are resolved through `IAgentConfigValueResolver`.
+
+See [docs/configuration.md](docs/configuration.md).
+
+## Schema discovery
+
+`describe_reporting_data` searches reporting schema metadata, not business data values.
+
+Good search concepts:
+
+```text
+user
+course
+certificate
+learning progress
+```
+
+A person name or arbitrary database value is not a schema search term.
+
+After a candidate is found, the tool should be called with the exact returned table name to obtain full field and relation metadata.
+
+The agent must not invent physical/source table names.
+
+## Query execution
+
+`execute_datahawk_query` expects:
 
 ```json
 {
   "query": {
     "type": "select",
-    "table": "user_report_rows",
-    "fields": [
-      {
-        "element": {
-          "type": "fld",
-          "table": "user_report_rows",
-          "field": "usr_id"
-        },
-        "alias": "usr_id"
-      },
-      {
-        "element": {
-          "type": "fld",
-          "table": "user_report_rows",
-          "field": "firstname"
-        },
-        "alias": "firstname"
-      }
-    ],
-    "where": {
-      "type": "op",
-      "operator": "=",
-      "params": [
-        {
-          "type": "fld",
-          "table": "user_report_rows",
-          "field": "firstname"
-        },
-        "Daniel"
-      ]
-    },
+    "table": "exact_table_returned_by_discovery",
+    "fields": [],
     "limit": 100
   }
 }
 ```
 
-The tool returns structured result data:
+The `query` value must be an object, not a JSON-encoded string.
 
-* columns,
-* rows,
-* row count,
-* sensitivity metadata,
-* effective root result limit.
+The tool returns structured data and does not expose generated SQL as its normal model-facing result.
 
-It does not return generated SQL or echo the submitted query back to the model.
+## Sensitivity metadata
 
-## Read-only boundary
+MissionBayReporting preserves ResourceFoundation sensitivity metadata. It does not automatically remove sensitive fields if the active project query scope exposes them.
 
-The tool accepts SELECT queries only.
+Authorization and reporting data scope therefore remain project/backend responsibilities. The agent tool enforces its configured table/domain/category/tag scope and read-only query contract, but it is not a replacement for backend authorization.
 
-Before a query reaches `IQueryService`, MissionBayReporting validates:
+## Vizion canvas tool
 
-* root queries,
-* UNION queries,
-* nested subqueries,
-* referenced tables,
-* referenced fields,
-* functions,
-* operators,
-* ordering directions,
-* explicit limits.
-
-Write operations such as `insert`, `update`, `delete`, DDL operations and transactions are rejected at the tool boundary.
-
-Personal and sensitive fields are not hidden by MissionBayReporting. If such fields are part of the configured reporting scope returned by `IQueryService`, the agent may select and filter them. Sensitivity markers remain available in metadata and query results.
-
-## Component preset configuration
-
-`DataHawkAgentTool` implements `ISchemaProvider`. Therefore normal MissionBay component presets can configure one reporting data set without another profile or settings system.
-
-Available settings:
-
-* `priority`
-* `domainFilter`
-* `categoryFilter`
-* `tagFilter`
-* `tableFilter`
-* `describeLimit`
-* `defaultLimit`
-* `maxLimit`
-
-All configured filters apply to both schema discovery and query execution. There is no separate prompt scope and execution scope.
-
-Example conceptual preset configuration:
-
-```json
-{
-  "domainFilter": ["ilias_materialized"],
-  "tableFilter": [
-    "user_report_rows",
-    "course_report_rows",
-    "certificate_report_rows"
-  ],
-  "describeLimit": 8,
-  "defaultLimit": 100,
-  "maxLimit": 1000
-}
-```
-
-A second reporting area such as AI usage reporting should be another normal configured instance of the same `datahawkagenttool` implementation with another scope. No additional routing or memory model is required.
-
-## No DataHawk reporting memory
-
-`DataHawkMemoryAgentResource` has been removed. Do not attach a separate DataHawk memory or context resource to an assistant node. The agent gets reporting context only when it calls `describe_reporting_data` for a reporting request.
-
-This prevents large reporting schemas from being added to unrelated conversations and keeps the tool contract small enough for normal model orchestration.
-
-## Existing Vizion resources
-
-The existing Vizion canvas resources remain available for installations that still use that workflow. They are independent of the DataHawk reporting tool described above.
-
-For a chatbot that already has its own graphical/table output capabilities, only `DataHawkAgentTool` is needed for data retrieval.
-
-## Dependencies
-
-The on-demand data tool uses:
-
-* `MissionBay\Api\IAgentTool`
-* `MissionBay\Api\IAgentConfigValueResolver`
-* `AssistantFoundation\Api\IAgentContext`
-* `ResourceFoundation\Api\IQueryService`
-* `Base3\Api\ISchemaProvider`
-* `Base3\Api\IOutputSchemaProvider`
-
-The reporting data path therefore consumes the ResourceFoundation contract rather than DataHawk implementation classes.
-
-## Project structure
+Technical name:
 
 ```text
-src/
-├── MissionBay/
-│   ├── DataHawkAgentTool.php
-│   ├── VizionCanvasAgentTool.php
-│   └── VizionMemoryAgentResource.php
-└── MissionBayReportingPlugin.php
+vizioncanvasagenttool
 ```
 
-## Version
+Tool function:
 
-Current package version: `4.2.2`.
+```text
+vizion_report_canvas
+```
+
+It uses `IReportExporterFactory` to render a table/chart report and publishes it to the chatbot event stream through:
+
+```text
+canvas.open
+canvas.render
+```
+
+The tool currently supports report types:
+
+```text
+table
+datatable
+piechart
+barchart
+```
+
+See [docs/vizion-integration.md](docs/vizion-integration.md).
+
+## Vizion memory resource
+
+Technical name:
+
+```text
+vizionmemoryagentresource
+```
+
+This resource is a legacy/current-compatibility memory resource that injects canvas/report usage rules and a schema-derived example as a system message.
+
+For normal on-demand reporting with `DataHawkAgentTool`, a separate DataHawk reporting memory is not required.
+
+## DataHawk report node
+
+Technical name:
+
+```text
+datahawkreportnode
+```
+
+This AgentFlow node accepts a JSON config string, resolves a DataHawk exporter and returns rendered report output, columns and SQL. It is a flow/reporting integration and is distinct from the safer model-facing `DataHawkAgentTool` contract.
+
+See [docs/report-node.md](docs/report-node.md).
+
+## Documentation map
+
+* [docs/overview.md](docs/overview.md)
+* [docs/datahawk-agent-tool.md](docs/datahawk-agent-tool.md)
+* [docs/query-contract-and-security.md](docs/query-contract-and-security.md)
+* [docs/configuration.md](docs/configuration.md)
+* [docs/vizion-integration.md](docs/vizion-integration.md)
+* [docs/report-node.md](docs/report-node.md)
+* [docs/api-reference.md](docs/api-reference.md)
+
+## Design rules
+
+* Prefer on-demand schema discovery over injecting the full reporting schema into every prompt.
+* Depend on ResourceFoundation query contracts for model-facing reporting data access.
+* Keep model-facing reporting read-only unless a separate deliberately reviewed mutation tool is introduced.
+* Configure reporting scope through normal MissionBay component presets.
+* Do not add a second reporting memory/profile architecture just to scope one tool instance.
+* Treat Vizion canvas rendering as a UI integration, not as the data authorization boundary.
 
 ## License
 
-GPL-3.0 License
+GPL-3.0.
