@@ -18,6 +18,8 @@ It consumes:
 
 ```text
 ResourceFoundation\Api\IQueryService
+ResourceFoundation\Api\IReportingScopeRegistry
+ResourceFoundation\Api\IScopedQuerySchemaProvider
 MissionBay\Api\IAgentConfigValueResolver
 ```
 
@@ -39,6 +41,10 @@ Arguments:
 search
   optional schema concept search
 
+schema
+  optional exact technical query-schema scope from discovery
+  required together with table
+
 table
   optional exact table name from a previous discovery result
 
@@ -46,7 +52,7 @@ limit
   optional candidate count, maximum 20
 ```
 
-When only `search` is provided, the tool returns bounded table candidates and representative fields. When an exact `table` is provided, the tool returns detailed field/relation metadata and the query rules required to build a valid request.
+When only `search` is provided, the tool returns bounded table candidates and representative fields. Every candidate contains its exact technical `schema`. When an exact `table` is requested, the same `schema` is required so duplicate local table names across technical scopes remain unambiguous.
 
 The search operates on schema metadata such as table names, labels, descriptions, tags and field metadata.
 
@@ -87,9 +93,11 @@ operation
 
 Additional structured result metadata is returned by the operation implementation.
 
-## Scope filtering
+## Reporting scope boundary
 
-Before schema candidates or queries are accepted, the tool builds an allowed table map from `IQueryService` metadata and applies configured filters:
+Each tool instance requires one `reportingScope` id. The tool resolves that id through `IReportingScopeRegistry` and reads only the reporting area's declared `querySchemaScopes` through `IScopedQuerySchemaProvider`.
+
+The optional filters remain additional restrictions inside that reporting scope:
 
 ```text
 domainFilter
@@ -98,7 +106,7 @@ tagFilter
 tableFilter
 ```
 
-An empty filter means no additional restriction for that dimension.
+An empty filter means no additional restriction for that dimension. The tool does not fall back to DataHawk's global or default schema scope.
 
 ## Limits
 
@@ -131,13 +139,13 @@ Tool
   -> candidate table names and representative fields
 
 Agent
-  -> describe_reporting_data(table="exact_returned_table")
+  -> describe_reporting_data(schema="exact_returned_schema", table="exact_returned_table")
 
 Tool
   -> full field metadata and query rules
 
 Agent
-  -> execute_datahawk_query(query={...})
+  -> execute_datahawk_query(query={"type":"select","schema":"exact_returned_schema",...})
 
 Tool
   -> rows/columns/count/sensitivity metadata

@@ -55,8 +55,8 @@ The intended usage is on demand:
 
 1. the agent receives a reporting question
 2. if schema is not already known from recent tool context, it calls `describe_reporting_data`
-3. it selects an exact table name returned by discovery
-4. it calls `execute_datahawk_query` with a structured SELECT object
+3. it selects the exact technical schema and table pair returned by discovery
+4. it calls `execute_datahawk_query` with a structured SELECT object containing that exact `schema`
 5. the tool returns rows, columns, sensitivity metadata and effective result limits
 
 The full reporting schema is not injected into every assistant call.
@@ -89,6 +89,7 @@ The tool implements `ISchemaProvider` and can be configured as a normal MissionB
 Supported settings:
 
 ```text
+reportingScope
 priority
 domainFilter
 categoryFilter
@@ -111,7 +112,7 @@ maxLimit = 1000
 
 If `defaultLimit` is configured above `maxLimit`, the runtime clamps the default to the hard maximum.
 
-All filter values are resolved through `IAgentConfigValueResolver`.
+`reportingScope` and all filter values are resolved through `IAgentConfigValueResolver`. The reporting scope id is required and is resolved through `IReportingScopeRegistry` to its technical query-schema scopes.
 
 See [docs/configuration.md](docs/configuration.md).
 

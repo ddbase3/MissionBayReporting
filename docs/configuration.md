@@ -8,6 +8,12 @@ No separate MissionBayReporting settings group is required for the model-facing 
 
 ## Schema
 
+### `reportingScope`
+
+Required exact id from `ResourceFoundation\Api\IReportingScopeRegistry`.
+
+The reporting scope defines which technical query-schema scopes belong to this tool instance. Schema discovery and query validation are restricted to those scopes.
+
 ### `priority`
 
 Tool catalog priority.
@@ -63,7 +69,7 @@ default = 1000
 
 ## Late value resolution
 
-Filters are passed through `IAgentConfigValueResolver`, so normal MissionBay config-value definitions can be used where the tool schema accepts them.
+`reportingScope` and filters are passed through `IAgentConfigValueResolver`, so normal MissionBay config-value definitions can be used where the tool schema accepts them.
 
 This allows project-specific scope values without adding a reporting-specific resolver.
 
@@ -76,11 +82,11 @@ Example:
 ```text
 reporting-users
   type: datahawkagenttool
-  tableFilter: user-oriented reporting tables
+  reportingScope: users
 
 reporting-ai-usage
   type: datahawkagenttool
-  tableFilter: AI usage reporting tables
+  reportingScope: ai-usage
 ```
 
 Do not create a new routing/profile layer just to distinguish these tool instances. The component preset ID already provides configured instance identity.

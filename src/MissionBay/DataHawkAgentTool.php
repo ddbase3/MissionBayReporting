@@ -24,6 +24,7 @@ use MissionBay\Api\IAgentConfigValueResolver;
 use MissionBay\Api\IAgentTool;
 use MissionBay\Resource\AbstractAgentResource;
 use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IScopedQuerySchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\JoinMetadata;
 use ResourceFoundation\Dto\TableMetadata;
@@ -145,6 +146,7 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 
 	public function __construct(
 		private readonly IQueryService $queryService,
+		private readonly IScopedQuerySchemaProvider $schemaProvider,
 		private readonly IAgentConfigValueResolver $resolver,
 		?string $id = null
 	) {
@@ -741,6 +743,7 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 			throw new \InvalidArgumentException($path . ': only SELECT queries are allowed.');
 		}
 		$query['type'] = 'select';
+		$this->applyQuerySchemaScope($query, $path);
 
 		$this->validateTechnicalNamespace($query['schema'] ?? null, $path . '.schema');
 		$this->validateTechnicalNamespace($query['provider'] ?? null, $path . '.provider');
@@ -904,6 +907,35 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 	private function queryBaseTable(array $query): ?string {
 		$table = trim((string)($query['table'] ?? $query['from'] ?? ''));
 		return $table !== '' ? $table : null;
+	}
+
+	private function applyQuerySchemaScope(array &$query, string $path): void {
+		if (trim((string)($query['schema'] ?? $query['provider'] ?? '')) !== '') {
+			return;
+		}
+
+		$tableName = $this->queryBaseTable($query);
+		if ($tableName === null) {
+			return;
+		}
+
+		$matches = [];
+		foreach ($this->schemaProvider->getScopes() as $scope) {
+			if ($this->schemaProvider->getTableForScope($scope, $tableName) instanceof TableMetadata) {
+				$matches[] = $scope;
+			}
+		}
+
+		if (count($matches) === 1) {
+			$query['schema'] = $matches[0];
+			return;
+		}
+
+		if (count($matches) > 1) {
+			throw new \InvalidArgumentException(
+				$path . ': table is available in multiple query schema scopes: ' . $tableName
+			);
+		}
 	}
 
 	private function requireAllowedTable(string $tableName, string $path): TableMetadata {
