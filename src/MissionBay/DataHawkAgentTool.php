@@ -49,6 +49,16 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 	private const DEFAULT_QUERY_LIMIT = 100;
 	private const DEFAULT_MAX_QUERY_LIMIT = 1000;
 
+	private const HELP_TOPICS = [
+		'fields',
+		'filters',
+		'aggregations',
+		'grouping',
+		'sorting',
+		'pagination',
+		'examples'
+	];
+
 	private const ALLOWED_ELEMENT_TYPES = [
 		'fld',
 		'fn',
@@ -255,10 +265,15 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 				'requiresApproval' => false,
 				'function' => [
 					'name' => self::FN_DESCRIBE,
-					'description' => 'Discover reporting tables and fields on demand. Search for schema concepts such as "user", "course", "certificate" or "learning progress", not for data values such as a person name. Search results return exact reporting table names and representative field names. After choosing a candidate, request that exact table once for full metadata, then execute the query. Never invent, infer or use physical/source table names that were not returned by this tool.',
+					'description' => 'Discover reporting tables and fields or request targeted DataHawk query help. Optional help topics: fields, filters, aggregations, grouping, sorting, pagination, examples. Use topic without search/table when query syntax is unclear. DataHawk resolves declared table relations automatically when fields from related returned tables are referenced. For schema discovery, search for concepts such as "user", "course", "certificate" or "learning progress", not data values such as a person name. Search results return exact reporting table names and representative field names. After choosing a candidate, request that exact table once for full metadata, then execute the query. Never invent physical/source table names. Aliases are result-column labels on fields entries and are never element types.',
 					'parameters' => [
 						'type' => 'object',
 						'properties' => [
+							'topic' => [
+								'type' => 'string',
+								'enum' => self::HELP_TOPICS,
+								'description' => 'Optional targeted query-help topic. Use without search/table. fields explains SELECT expressions and aliases; filters explains where/having; aggregations explains COUNT/SUM/AVG/MIN/MAX and distinct; grouping explains group_by/having; sorting explains order_by including aggregate sorting; pagination explains limit/offset; examples returns complete query patterns.'
+							],
 							'search' => [
 								'type' => 'string',
 								'description' => 'Optional schema search text matched against table names, labels, descriptions, tags and field metadata.'
@@ -290,7 +305,7 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 				'requiresApproval' => false,
 				'function' => [
 					'name' => self::FN_QUERY,
-					'description' => 'Execute one read-only structured DataHawk SELECT query and return rows plus column metadata. Use describe_reporting_data first unless the relevant table and field names are already known from a previous reporting tool result. The query argument must be an object, never a JSON string.',
+					'description' => 'Execute one read-only structured DataHawk SELECT query and return rows plus column metadata. Use describe_reporting_data first unless the relevant table and field names are already known from a previous reporting tool result. For COUNT/SUM/AVG, grouping or sorting syntax, request describe_reporting_data with topic="aggregations", "grouping" or "sorting". Aliases belong only to SELECT fields entries beside element; never use type="alias". When sorting or filtering an aggregate, repeat the underlying fn expression instead of referencing its result alias. The query argument must be an object, never a JSON string.',
 					'parameters' => [
 						'type' => 'object',
 						'properties' => [
@@ -339,8 +354,17 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 	 */
 	private function callDescribe(array $arguments): array {
 		try {
+			$topic = strtolower(trim((string)($arguments['topic'] ?? '')));
 			$tableName = trim((string)($arguments['table'] ?? ''));
 			$search = trim((string)($arguments['search'] ?? ''));
+
+			if ($topic !== '') {
+				if ($tableName !== '' || $search !== '') {
+					throw new \InvalidArgumentException('topic cannot be combined with search or table. Request query help or schema metadata in one call.');
+				}
+				return $this->describeHelpTopic($topic);
+			}
+
 			$limit = $this->resolveCallLimit($arguments['limit'] ?? null);
 
 			if ($tableName !== '') {
@@ -351,6 +375,270 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 		} catch (\Throwable $e) {
 			return $this->errorResult(self::FN_DESCRIBE, 'describe_failed', $e->getMessage());
 		}
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function describeHelpTopic(string $topic): array {
+		if (!in_array($topic, self::HELP_TOPICS, true)) {
+			return [
+				'ok' => false,
+				'operation' => self::FN_DESCRIBE,
+				'error' => [
+					'code' => 'unknown_help_topic',
+					'message' => 'Unknown reporting help topic: ' . $topic
+				],
+				'available_topics' => self::HELP_TOPICS
+			];
+		}
+
+		return [
+			'ok' => true,
+			'operation' => self::FN_DESCRIBE,
+			'mode' => 'help',
+			'topic' => $topic,
+			'help' => $this->queryHelp($topic)
+		];
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function queryHelp(string $topic): array {
+		return match ($topic) {
+			'fields' => [
+				'title' => 'SELECT fields and result aliases',
+				'rules' => [
+					'Every SELECT fields entry wraps one expression in element.',
+					'Put alias beside element in the fields entry. There is no alias element and type=alias is invalid.',
+					'Use type=fld for a field reference and type=fn for a function expression.',
+					'Use only table and field names returned by schema discovery.'
+				],
+				'example' => [
+					'fields' => [
+						[
+							'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'FIELD'],
+							'alias' => 'result_name'
+						],
+						[
+							'element' => ['type' => 'fn', 'function' => 'COUNT', 'params' => [1]],
+							'alias' => 'row_count'
+						]
+					]
+				]
+			],
+			'filters' => [
+				'title' => 'WHERE and HAVING conditions',
+				'rules' => [
+					'where and having contain expression objects directly, not fields-entry wrappers.',
+					'Use type=op with operator and params. Nested AND/OR conditions are also type=op.',
+					'Omit where or having completely when no condition is required.',
+					'Use having for conditions on aggregate expressions.'
+				],
+				'examples' => [
+					'where' => [
+						'type' => 'op',
+						'operator' => '=',
+						'params' => [
+							['type' => 'fld', 'table' => 'TABLE', 'field' => 'STATUS_FIELD'],
+							1
+						]
+					],
+					'having' => [
+						'type' => 'op',
+						'operator' => '>',
+						'params' => [
+							['type' => 'fn', 'function' => 'COUNT', 'params' => [1]],
+							5
+						]
+					]
+				]
+			],
+			'aggregations' => [
+				'title' => 'Aggregate functions',
+				'rules' => [
+					'Aggregates are normal fn elements. Common aggregate functions are COUNT, SUM, AVG, MIN, MAX and GROUP_CONCAT.',
+					'COUNT with params=[1] counts rows. COUNT with a fld param counts non-null field values.',
+					'Use distinct=true on the fn element for COUNT(DISTINCT field) or another DISTINCT aggregate.',
+					'The result alias belongs to the outer fields entry, never inside the fn element.',
+					'For top-N aggregate reports, add group_by and sort by repeating the same fn expression in order_by. Do not use type=alias.',
+					'Fields from related returned tables may be referenced directly; DataHawk resolves declared relations automatically.'
+				],
+				'examples' => [
+					'count_rows' => [
+						'element' => ['type' => 'fn', 'function' => 'COUNT', 'params' => [1]],
+						'alias' => 'row_count'
+					],
+					'count_distinct' => [
+						'element' => [
+							'type' => 'fn',
+							'function' => 'COUNT',
+							'params' => [
+								['type' => 'fld', 'table' => 'RELATED_TABLE', 'field' => 'COUNT_FIELD']
+							],
+							'distinct' => true
+						],
+						'alias' => 'distinct_count'
+					],
+					'top_n_by_count' => $this->topNCountExample()
+				]
+			],
+			'grouping' => [
+				'title' => 'GROUP BY and HAVING',
+				'rules' => [
+					'group_by is an array of expression elements directly. Do not wrap group_by entries in element/alias field wrappers.',
+					'Every selected non-aggregate grouping value should normally appear in group_by.',
+					'having uses the same op/fn expression syntax as where and may contain aggregate functions.',
+					'Repeat the aggregate expression in having. Result aliases are not expression elements.'
+				],
+				'example' => [
+					'group_by' => [
+						['type' => 'fld', 'table' => 'TABLE', 'field' => 'GROUP_FIELD']
+					],
+					'having' => [
+						'type' => 'op',
+						'operator' => '>',
+						'params' => [
+							[
+								'type' => 'fn',
+								'function' => 'COUNT',
+								'params' => [
+									['type' => 'fld', 'table' => 'RELATED_TABLE', 'field' => 'COUNT_FIELD']
+								]
+							],
+							5
+						]
+					]
+				]
+			],
+			'sorting' => [
+				'title' => 'ORDER BY',
+				'rules' => [
+					'order_by is an array. Every entry contains element and optional direction ASC or DESC.',
+					'To sort by a normal field, put a fld expression in element.',
+					'To sort by an aggregate, put the fn expression itself in element.',
+					'Do not reference a SELECT result alias with type=alias. Repeat the underlying fld/fn expression.'
+				],
+				'examples' => [
+					'field' => [
+						'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'SORT_FIELD'],
+						'direction' => 'ASC'
+					],
+					'aggregate' => [
+						'element' => [
+							'type' => 'fn',
+							'function' => 'COUNT',
+							'params' => [
+								['type' => 'fld', 'table' => 'RELATED_TABLE', 'field' => 'COUNT_FIELD']
+							]
+						],
+						'direction' => 'DESC'
+					]
+				]
+			],
+			'pagination' => [
+				'title' => 'LIMIT and OFFSET',
+				'rules' => [
+					'limit is the maximum number of result rows and must be at least 1.',
+					'offset is a zero-based non-negative row offset.',
+					'If the root query omits limit, the reporting tool adds its configured default limit.',
+					'Explicit limits above the configured maximum are rejected.'
+				],
+				'example' => ['limit' => 25, 'offset' => 50]
+			],
+			'examples' => [
+				'title' => 'Complete structured query patterns',
+				'rules' => [
+					'Replace TABLE/FIELD placeholders only with exact names returned by schema discovery.',
+					'For related-table fields, reference the related returned table directly and let DataHawk resolve declared relations.',
+					'Keep aliases only on fields entries.'
+				],
+				'examples' => [
+					'simple_filter' => $this->simpleFilterExample(),
+					'top_n_by_count' => $this->topNCountExample()
+				]
+			],
+			default => []
+		};
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function simpleFilterExample(): array {
+		return [
+			'type' => 'select',
+			'table' => 'TABLE',
+			'fields' => [
+				[
+					'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'ID_FIELD'],
+					'alias' => 'id'
+				],
+				[
+					'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'LABEL_FIELD'],
+					'alias' => 'label'
+				]
+			],
+			'where' => [
+				'type' => 'op',
+				'operator' => '=',
+				'params' => [
+					['type' => 'fld', 'table' => 'TABLE', 'field' => 'STATUS_FIELD'],
+					1
+				]
+			],
+			'order_by' => [
+				[
+					'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'LABEL_FIELD'],
+					'direction' => 'ASC'
+				]
+			],
+			'limit' => 25
+		];
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function topNCountExample(): array {
+		$countExpression = [
+			'type' => 'fn',
+			'function' => 'COUNT',
+			'params' => [
+				['type' => 'fld', 'table' => 'RELATED_TABLE', 'field' => 'COUNT_FIELD']
+			]
+		];
+
+		return [
+			'type' => 'select',
+			'table' => 'BASE_TABLE',
+			'fields' => [
+				[
+					'element' => ['type' => 'fld', 'table' => 'BASE_TABLE', 'field' => 'GROUP_ID_FIELD'],
+					'alias' => 'group_id'
+				],
+				[
+					'element' => ['type' => 'fld', 'table' => 'BASE_TABLE', 'field' => 'GROUP_LABEL_FIELD'],
+					'alias' => 'group_label'
+				],
+				[
+					'element' => $countExpression,
+					'alias' => 'item_count'
+				]
+			],
+			'group_by' => [
+				['type' => 'fld', 'table' => 'BASE_TABLE', 'field' => 'GROUP_ID_FIELD'],
+				['type' => 'fld', 'table' => 'BASE_TABLE', 'field' => 'GROUP_LABEL_FIELD']
+			],
+			'order_by' => [
+				[
+					'element' => $countExpression,
+					'direction' => 'DESC'
+				]
+			],
+			'limit' => 5
+		];
 	}
 
 	/**
@@ -680,6 +968,7 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 		return [
 			'read_only' => true,
 			'query_type' => 'select',
+			'help_topics' => self::HELP_TOPICS,
 			'field_entry' => [
 				'element' => ['type' => 'fld', 'table' => 'TABLE', 'field' => 'FIELD'],
 				'alias' => 'RESULT_COLUMN'
@@ -698,6 +987,8 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 				'Use only table and field names returned by this tool.',
 				'Omit where and having completely when they are not needed.',
 				'Use type=fld for fields, type=fn for functions and type=op for conditions.',
+				'Aliases are result-column labels on fields entries. There is no type=alias element. Repeat the underlying field or function expression in group_by, having and order_by.',
+				'For exact COUNT/SUM/AVG, group_by and order_by patterns, call describe_reporting_data with topic=aggregations, grouping, sorting or examples.',
 				'DataHawk resolves declared table relations automatically when fields from related tables are referenced.',
 				'Personal and sensitive fields are queryable when they are present in the configured reporting scope.'
 			]
@@ -807,10 +1098,22 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 		}
 
 		$type = isset($value['type']) ? strtolower(trim((string)$value['type'])) : '';
-		if ($type !== '' && in_array($type, self::ALLOWED_ELEMENT_TYPES, true)) {
-			$this->validateElement($value, $type, $baseTable, $path);
-			if ($type === 'subquery') {
-				return;
+		if ($type !== '') {
+			if (in_array($type, self::ALLOWED_ELEMENT_TYPES, true)) {
+				$this->validateElement($value, $type, $baseTable, $path);
+				if ($type === 'subquery') {
+					return;
+				}
+			} elseif ($type !== 'select') {
+				if ($type === 'alias') {
+					throw new \InvalidArgumentException(
+						$path . ': alias is not an element type. Put alias beside element in a SELECT fields entry. ' .
+						'For group_by, having or order_by, repeat the underlying fld/fn expression instead of referencing a result alias.'
+					);
+				}
+				throw new \InvalidArgumentException(
+					$path . ': unsupported reporting element type: ' . $type . '. Allowed element types: ' . implode(', ', self::ALLOWED_ELEMENT_TYPES)
+				);
 			}
 		}
 
