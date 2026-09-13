@@ -104,7 +104,10 @@ class VizionMemoryAgentResourceTest extends TestCase {
 		$prompt = (string)$history[0]['content'];
 
 		$this->assertStringContainsString('## Canvas Output Policy', $prompt);
-		$this->assertStringContainsString('## Vizion Report Tool Rules (`vizion_report_canvas`)', $prompt);
+		$this->assertStringContainsString('## Reporting Tool Rules', $prompt);
+		$this->assertStringContainsString('describe_vizion_reports', $prompt);
+		$this->assertStringContainsString('execute_vizion_report', $prompt);
+		$this->assertStringContainsString('search_vizion_tree', $prompt);
 		$this->assertStringContainsString('vizion_report_canvas', $prompt);
 		$this->assertStringContainsString('execute_datahawk_query', $prompt);
 

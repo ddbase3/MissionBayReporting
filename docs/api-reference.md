@@ -14,6 +14,26 @@ Technical name: `datahawkagenttool`
 class DataHawkAgentTool extends AbstractAgentResource implements IAgentTool, ISchemaProvider, IOutputSchemaProvider
 ```
 
+## `VizionReportAgentTool`
+
+File: `src/MissionBay/VizionReportAgentTool.php`
+
+Technical name: `vizionreportagenttool`
+
+```php
+final class VizionReportAgentTool extends AbstractAgentResource implements IAgentTool, ISchemaProvider, IOutputSchemaProvider
+```
+
+Tool functions:
+
+```text
+describe_vizion_reports
+execute_vizion_report
+search_vizion_tree
+```
+
+The tool depends on `Vizion\Api\IReportDataService` and exposes finished Vizion reports instead of constructing DataHawk query ASTs itself.
+
 ## `VizionCanvasAgentTool`
 
 File: `src/MissionBay/VizionCanvasAgentTool.php`

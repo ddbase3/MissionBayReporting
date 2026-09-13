@@ -4,7 +4,7 @@
 
 MissionBayReporting is a MissionBay extension package for reporting and visualization use cases.
 
-Its primary current integration is `DataHawkAgentTool`, which exposes on-demand reporting schema discovery and read-only structured query execution through the neutral `ResourceFoundation` query contracts.
+Its primary curated-report integration is `VizionReportAgentTool`, which exposes finished Vizion reports through Vizion's headless `IReportDataService`. `DataHawkAgentTool` remains available for ad-hoc analytical queries through the neutral `ResourceFoundation` query contracts.
 
 The package also retains Vizion-oriented canvas resources and a DataHawk report node for installations that use the older/report-rendering flow path.
 
@@ -12,10 +12,12 @@ The package also retains Vizion-oriented canvas resources and a DataHawk report 
 
 ```mermaid
 flowchart TD
-    A[MissionBay agent] --> T[DataHawkAgentTool]
-    T --> Q[ResourceFoundation IQueryService]
-    Q --> S[IQuerySchemaProvider / query backend]
-    T --> R[structured rows and metadata]
+    A[MissionBay agent] --> Z[VizionReportAgentTool]
+    Z --> D[Vizion IReportDataService]
+    D --> Q[ResourceFoundation IQueryService]
+
+    A --> T[DataHawkAgentTool]
+    T --> Q
 
     A --> V[VizionCanvasAgentTool]
     V --> E[DataHawk IReportExporterFactory]
@@ -35,6 +37,26 @@ This keeps the agent tool reusable with any project implementation that fills th
 `MissionBayReportingPlugin::init()` only registers the plugin object itself.
 
 The reporting classes are discoverable through the BASE3 class map and are normally instantiated as MissionBay component presets or flow nodes. The plugin does not create a second service registry.
+
+## Vizion report agent tool
+
+Technical resource name:
+
+```text
+vizionreportagenttool
+```
+
+It exposes three read-only functions:
+
+```text
+describe_vizion_reports
+execute_vizion_report
+search_vizion_tree
+```
+
+Use this tool first when a user request can be answered by an existing Vizion report. It uses the same vdef, filters, tree filters, sorting, paging and secured query path as the ModularGrid web display.
+
+See [docs/vizion-report-agent-tool.md](docs/vizion-report-agent-tool.md).
 
 ## DataHawk agent tool
 
@@ -89,7 +111,7 @@ The tool implements `ISchemaProvider` and can be configured as a normal MissionB
 Supported settings:
 
 ```text
-reportingScope
+reportingscope
 priority
 domainFilter
 categoryFilter
@@ -112,7 +134,7 @@ maxLimit = 1000
 
 If `defaultLimit` is configured above `maxLimit`, the runtime clamps the default to the hard maximum.
 
-`reportingScope` and all filter values are resolved through `IAgentConfigValueResolver`. The reporting scope id is required and is resolved through `IReportingScopeRegistry` to its technical query-schema scopes.
+`reportingscope` and all filter values are resolved through `IAgentConfigValueResolver`. The reporting scope id is required and is resolved through `IReportingScopeRegistry` to its technical query-schema scopes.
 
 See [docs/configuration.md](docs/configuration.md).
 
@@ -202,7 +224,7 @@ vizionmemoryagentresource
 
 This resource is a legacy/current-compatibility memory resource that injects canvas/report usage rules and a schema-derived example as a system message.
 
-For normal on-demand reporting with `DataHawkAgentTool`, a separate DataHawk reporting memory is not required.
+For normal on-demand reporting, the memory now prefers `VizionReportAgentTool` when a finished Vizion report matches the request and falls back to `DataHawkAgentTool` for ad-hoc analysis.
 
 ## DataHawk report node
 
@@ -219,6 +241,7 @@ See [docs/report-node.md](docs/report-node.md).
 ## Documentation map
 
 * [docs/overview.md](docs/overview.md)
+* [docs/vizion-report-agent-tool.md](docs/vizion-report-agent-tool.md)
 * [docs/datahawk-agent-tool.md](docs/datahawk-agent-tool.md)
 * [docs/query-contract-and-security.md](docs/query-contract-and-security.md)
 * [docs/configuration.md](docs/configuration.md)
@@ -228,7 +251,8 @@ See [docs/report-node.md](docs/report-node.md).
 
 ## Design rules
 
-* Prefer on-demand schema discovery over injecting the full reporting schema into every prompt.
+* Prefer finished Vizion reports when they already model the requested business question.
+* Prefer on-demand schema discovery over injecting the full reporting schema into every prompt for ad-hoc DataHawk analysis.
 * Depend on ResourceFoundation query contracts for model-facing reporting data access.
 * Keep model-facing reporting read-only unless a separate deliberately reviewed mutation tool is introduced.
 * Configure reporting scope through normal MissionBay component presets.

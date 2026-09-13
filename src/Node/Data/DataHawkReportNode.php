@@ -18,17 +18,18 @@
 namespace MissionBayReporting\Node\Data;
 
 use AssistantFoundation\Api\IAgentContext;
+use Base3\Api\IClassMap;
 use MissionBay\Agent\AgentNodePort;
 use MissionBay\Node\AbstractAgentNode;
-use DataHawk\Api\IReportExporterFactory;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IReportExporter;
 
 class DataHawkReportNode extends AbstractAgentNode {
 
-	private IReportExporterFactory $reportexporterfactory;
-
-	public function __construct(IReportExporterFactory $reportexporterfactory) {
-		$this->reportexporterfactory = $reportexporterfactory;
-	}
+	public function __construct(
+		private readonly IQueryService $queryService,
+		private readonly IClassMap $classMap
+	) {}
 
 	public static function getName(): string {
 		return 'datahawkreportnode';
@@ -83,25 +84,28 @@ class DataHawkReportNode extends AbstractAgentNode {
 	public function execute(array $inputs, array $resources, IAgentContext $context): array {
 		$configStr = $inputs['config'] ?? '';
 
-		if (!is_string($configStr) || trim($configStr) === '') {
+		if(!is_string($configStr) || trim($configStr) === '') {
 			return ['error' => $this->error('Missing or invalid config input')];
 		}
 
 		$config = json_decode($configStr, true);
 
-		if (!is_array($config)) {
+		if(!is_array($config)) {
 			return ['error' => $this->error('Could not parse config JSON')];
 		}
 
-		if (!isset($config['type']) || !isset($config['query'])) {
+		if(!isset($config['type']) || !isset($config['query'])) {
 			return ['error' => $this->error('Missing "type" or "query" in config')];
+		}
+
+		if(!is_array($config['query'])) {
+			return ['error' => $this->error('Invalid "query" in config')];
 		}
 
 		try {
 			$response = $config['message'] ?? '';
-
 			$type = strtolower((string)$config['type']);
-			$exporterType = match ($type) {
+			$exporterType = match($type) {
 				'table' => 'htmltablereportexporter',
 				'datatable' => 'datatablereportexporter',
 				'piechart' => 'piechartreportexporter',
@@ -109,23 +113,28 @@ class DataHawkReportNode extends AbstractAgentNode {
 				default => 'htmltablereportexporter'
 			};
 
-			// TODO maybe better use reportqueryservice 
-			$exporter = $this->reportexporterfactory->createExporter($exporterType);
-			$report = $exporter->setExportQuery($config['query'])->toString();
-			$sql = $exporter->toSql();
+			$result = $this->queryService->executeQuery($config['query']);
+			$exporter = $this->classMap->getInstanceByInterfaceName(IReportExporter::class, $exporterType);
 
-			$columns = null;
-			$result = $exporter->getResult();
-			if ($result != null) $columns = $result->columns;
+			if(!$exporter instanceof IReportExporter) {
+				throw new \RuntimeException('Report exporter is not available: ' . $exporterType);
+			}
 
-			return ['response' => $response, 'report' => $report, 'sql' => $sql, 'columns' => $columns];
-		} catch (\Throwable $e) {
+			$report = $exporter->setResult($result)->toString();
+
+			return [
+				'response' => $response,
+				'report' => $report,
+				'sql' => $result->debugSql,
+				'columns' => $result->columns
+			];
+		}
+		catch(\Throwable $e) {
 			return ['error' => $this->error('Report generation failed: ' . $e->getMessage())];
 		}
 	}
 
 	public function getDescription(): string {
-		return 'Creates a report using DataHawk\'s exporter based on a JSON config string.';
+		return 'Creates a report from a structured ResourceFoundation query using a discoverable report exporter.';
 	}
 }
-

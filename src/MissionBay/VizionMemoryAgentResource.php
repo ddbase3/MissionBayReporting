@@ -118,7 +118,20 @@ TXT);
 
 	private function getVizionRulesBlock(): string {
 		return trim(<<<'TXT'
-## Vizion Report Tool Rules (`vizion_report_canvas`)
+## Reporting Tool Rules
+
+Prefer finished Vizion reports when the user's request matches an existing report.
+
+### Curated Vizion reports
+
+* Use `describe_vizion_reports` to find a suitable report and inspect its fields, filters and tree filters.
+* Use `search_vizion_tree` to resolve exact category or organisation-unit node ids. Never invent tree node ids.
+* Use `execute_vizion_report` to answer with data from the finished report.
+* Use `execute_datahawk_query` only for analytical questions that are not represented by a suitable Vizion report.
+
+The Vizion report tools preserve the configured report semantics, filters, tree filters, sorting and reporting security. Do not reconstruct an existing Vizion report as an ad-hoc DataHawk query.
+
+### Canvas reports (`vizion_report_canvas`)
 
 The `vizion_report_canvas` tool executes a DataHawk report and renders the HTML result into the chatbot canvas using a single HTML block.
 
@@ -143,15 +156,16 @@ You call the tool with arguments like this:
 
 The `config` object must be present and must contain at least:
 
-* `type` – the visualization type: `table`, `datatable`, `barchart`, `piechart`
-* `query` – a valid DataHawk query object (see DataHawk rules)
+* `type` - the visualization type: `table`, `datatable`, `barchart`, `piechart`
+* `query` - a valid DataHawk query object (see DataHawk rules)
 
 `config.query` should be a JSON object, not a JSON string.
 
-### Tool Choice
+### Canvas Tool Choice
 
-* If the user wants data explained directly in chat: call `execute_datahawk_query`.
-* If the user wants a visual table or chart in the canvas: call `vizion_report_canvas`.
+* If the user wants data from an existing report explained directly in chat: call `execute_vizion_report`.
+* If no suitable Vizion report exists and the user wants data explained directly in chat: call `execute_datahawk_query`.
+* If the user explicitly wants a visual table or chart in the canvas, use `vizion_report_canvas` for now. This canvas tool remains DataHawk-based.
 
 After calling `vizion_report_canvas`, respond in chat with one short confirmation sentence.
 TXT);

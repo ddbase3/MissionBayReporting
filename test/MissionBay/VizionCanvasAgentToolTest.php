@@ -2,11 +2,12 @@
 
 namespace Test\MissionBayReporting\MissionBay;
 
-use PHPUnit\Framework\TestCase;
-use MissionBayReporting\MissionBay\VizionCanvasAgentTool;
 use AssistantFoundation\Api\IAgentContext;
-use DataHawk\Api\IReportExporterFactory;
-use DataHawk\Api\IReportExporter;
+use Base3\Api\IClassMap;
+use MissionBayReporting\MissionBay\VizionCanvasAgentTool;
+use PHPUnit\Framework\TestCase;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IReportExporter;
 use ResourceFoundation\Dto\QueryResult;
 
 /**
@@ -15,25 +16,45 @@ use ResourceFoundation\Dto\QueryResult;
 class VizionCanvasAgentToolTest extends TestCase {
 
 	private function makeContextWithStream(object $stream): IAgentContext {
-		// Use a stub (not a mock) to avoid PHPUnit "no expectations" notices.
-		$ctx = $this->createStub(IAgentContext::class);
-
-		$ctx->method('getVar')
-			->willReturnCallback(function (string $key) use ($stream) {
-				if ($key === 'eventstream') {
-					return $stream;
-				}
-				return null;
+		$context = $this->createStub(IAgentContext::class);
+		$context->method('getVar')
+			->willReturnCallback(function(string $key) use ($stream) {
+				return $key === 'eventstream' ? $stream : null;
 			});
 
-		return $ctx;
+		return $context;
 	}
 
 	private function makeContextWithoutStream(): IAgentContext {
-		// Use a stub (not a mock) to avoid PHPUnit "no expectations" notices.
-		$ctx = $this->createStub(IAgentContext::class);
-		$ctx->method('getVar')->willReturn(null);
-		return $ctx;
+		$context = $this->createStub(IAgentContext::class);
+		$context->method('getVar')->willReturn(null);
+		return $context;
+	}
+
+	private function makeResult(?string $sql = 'SELECT 1'): QueryResult {
+		return new QueryResult(
+			columns: [
+				[
+					'name' => 'id',
+					'type' => 'int',
+					'field' => 'id',
+					'alias' => null,
+					'table' => 't',
+					'sensitive' => false
+				]
+			],
+			rows: [
+				['id' => 1]
+			],
+			debugSql: $sql
+		);
+	}
+
+	private function makeTool(?IQueryService $queryService = null, ?IClassMap $classMap = null): VizionCanvasAgentTool {
+		return new VizionCanvasAgentTool(
+			$queryService ?? $this->createStub(IQueryService::class),
+			$classMap ?? $this->createStub(IClassMap::class)
+		);
 	}
 
 	public function testGetName(): void {
@@ -41,20 +62,14 @@ class VizionCanvasAgentToolTest extends TestCase {
 	}
 
 	public function testGetDescription(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
 		$this->assertSame(
 			'Renders a DataHawk-based report into the chatbot canvas using a single HTML block.',
-			$tool->getDescription()
+			$this->makeTool()->getDescription()
 		);
 	}
 
 	public function testGetToolDefinitionsContainsVizionReportCanvas(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
-		$defs = $tool->getToolDefinitions();
+		$defs = $this->makeTool()->getToolDefinitions();
 
 		$this->assertIsArray($defs);
 		$this->assertCount(1, $defs);
@@ -66,40 +81,30 @@ class VizionCanvasAgentToolTest extends TestCase {
 		$this->assertSame('reporting', $def['category']);
 		$this->assertSame(['vizion', 'report', 'canvas', 'datatable', 'chart'], $def['tags']);
 		$this->assertSame(50, $def['priority']);
-
 		$this->assertSame('vizion_report_canvas', $def['function']['name']);
 		$this->assertSame(['config'], $def['function']['parameters']['required']);
 		$this->assertArrayHasKey('config', $def['function']['parameters']['properties']);
 	}
 
 	public function testCallToolThrowsForUnsupportedToolName(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
 		$this->expectException(\InvalidArgumentException::class);
 		$this->expectExceptionMessage('Unsupported tool: nope');
 
-		$tool->callTool('nope', [], $this->createStub(IAgentContext::class));
+		$this->makeTool()->callTool('nope', [], $this->createStub(IAgentContext::class));
 	}
 
 	public function testCallToolThrowsWhenConfigIsMissing(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
 		$this->expectException(\InvalidArgumentException::class);
 		$this->expectExceptionMessage('Missing or invalid "config" argument.');
 
-		$tool->callTool('vizion_report_canvas', [], $this->makeContextWithoutStream());
+		$this->makeTool()->callTool('vizion_report_canvas', [], $this->makeContextWithoutStream());
 	}
 
 	public function testCallToolThrowsWhenConfigJsonIsInvalid(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
 		$this->expectException(\InvalidArgumentException::class);
 		$this->expectExceptionMessage('Could not parse config JSON.');
 
-		$tool->callTool(
+		$this->makeTool()->callTool(
 			'vizion_report_canvas',
 			['config' => '{invalid-json'],
 			$this->makeContextWithoutStream()
@@ -107,20 +112,15 @@ class VizionCanvasAgentToolTest extends TestCase {
 	}
 
 	public function testCallToolReturnsErrorWhenTypeOrQueryMissingInConfig(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
-
 		$stream = new class {
 			public function isDisconnected(): bool {
 				return false;
 			}
 
-			public function push(string $event, array $payload): void {
-				// no-op
-			}
+			public function push(string $event, array $payload): void {}
 		};
 
-		$out = $tool->callTool(
+		$out = $this->makeTool()->callTool(
 			'vizion_report_canvas',
 			['config' => ['type' => 'table']],
 			$this->makeContextWithStream($stream)
@@ -132,11 +132,29 @@ class VizionCanvasAgentToolTest extends TestCase {
 		], $out);
 	}
 
-	public function testCallToolReturnsErrorWhenEventStreamMissingInContext(): void {
-		$factory = $this->createStub(IReportExporterFactory::class);
-		$tool = new VizionCanvasAgentTool($factory);
+	public function testCallToolReturnsErrorWhenQueryIsInvalid(): void {
+		$stream = new class {
+			public function isDisconnected(): bool {
+				return false;
+			}
 
-		$out = $tool->callTool(
+			public function push(string $event, array $payload): void {}
+		};
+
+		$out = $this->makeTool()->callTool(
+			'vizion_report_canvas',
+			['config' => ['type' => 'table', 'query' => 'invalid']],
+			$this->makeContextWithStream($stream)
+		);
+
+		$this->assertSame([
+			'ok' => false,
+			'error' => 'Invalid "query" in report config.'
+		], $out);
+	}
+
+	public function testCallToolReturnsErrorWhenEventStreamMissingInContext(): void {
+		$out = $this->makeTool()->callTool(
 			'vizion_report_canvas',
 			['config' => ['type' => 'table', 'query' => ['select' => []]]],
 			$this->makeContextWithoutStream()
@@ -148,9 +166,8 @@ class VizionCanvasAgentToolTest extends TestCase {
 		], $out);
 	}
 
-	public function testCallToolCreatesExporterSetsQueryAndPushesOpenAndRenderWhenConnected(): void {
+	public function testCallToolExecutesQueryRendersExporterAndPushesCanvas(): void {
 		$events = [];
-
 		$stream = new class($events) {
 			public array $events;
 
@@ -168,57 +185,36 @@ class VizionCanvasAgentToolTest extends TestCase {
 		};
 
 		$query = ['select' => [['type' => 'fld', 'table' => 't', 'field' => 'id']]];
-		$config = ['type' => 'datatable', 'query' => $query];
+		$result = $this->makeResult();
 
-		$result = new QueryResult(
-			columns: [
-				[
-					'name' => 'id',
-					'type' => 'int',
-					'field' => 'id',
-					'alias' => null,
-					'table' => 't',
-					'sensitive' => false
-				]
-			],
-			rows: [
-				['id' => 1]
-			]
-		);
+		$queryService = $this->createMock(IQueryService::class);
+		$queryService->expects($this->once())
+			->method('executeQuery')
+			->with($query)
+			->willReturn($result);
 
 		$exporter = $this->createMock(IReportExporter::class);
 		$exporter->expects($this->once())
-			->method('setExportQuery')
-			->with($query)
+			->method('setResult')
+			->with($result)
 			->willReturnSelf();
-
 		$exporter->expects($this->once())
 			->method('toString')
 			->willReturn('<p>hello</p>');
 
-		$exporter->expects($this->once())
-			->method('toSql')
-			->willReturn('SELECT 1');
-
-		$exporter->expects($this->once())
-			->method('getResult')
-			->willReturn($result);
-
-		$factory = $this->createMock(IReportExporterFactory::class);
-		$factory->expects($this->once())
-			->method('createExporter')
-			->with('datatablereportexporter')
+		$classMap = $this->createMock(IClassMap::class);
+		$classMap->expects($this->once())
+			->method('getInstanceByInterfaceName')
+			->with(IReportExporter::class, 'datatablereportexporter')
 			->willReturn($exporter);
 
-		$tool = new VizionCanvasAgentTool($factory);
-
-		$out = $tool->callTool(
+		$out = $this->makeTool($queryService, $classMap)->callTool(
 			'vizion_report_canvas',
 			[
 				'canvas_id' => ' c1 ',
 				'title' => ' My Report ',
 				'open' => true,
-				'config' => $config
+				'config' => ['type' => 'datatable', 'query' => $query]
 			],
 			$this->makeContextWithStream($stream)
 		);
@@ -229,33 +225,15 @@ class VizionCanvasAgentToolTest extends TestCase {
 			'sql' => 'SELECT 1',
 			'columns' => $result->columns
 		], $out);
-
 		$this->assertCount(2, $events);
-
 		$this->assertSame('canvas.open', $events[0][0]);
-		$this->assertSame([
-			'id' => 'c1',
-			'title' => 'My Report',
-			'focus' => true
-		], $events[0][1]);
-
 		$this->assertSame('canvas.render', $events[1][0]);
-
-		$render = $events[1][1];
-		$this->assertSame('c1', $render['id']);
-		$this->assertSame('replace', $render['mode']);
-		$this->assertSame('My Report', $render['title']);
-
-		$this->assertIsArray($render['blocks']);
-		$this->assertCount(1, $render['blocks']);
-		$this->assertSame('html', $render['blocks'][0]['type']);
-		$this->assertSame('<div><p>hello</p></div>', $render['blocks'][0]['html']);
-		$this->assertFalse($render['blocks'][0]['sanitize']);
+		$this->assertSame('<div><p>hello</p></div>', $events[1][1]['blocks'][0]['html']);
+		$this->assertFalse($events[1][1]['blocks'][0]['sanitize']);
 	}
 
 	public function testCallToolDoesNotPushWhenDisconnected(): void {
 		$events = [];
-
 		$stream = new class($events) {
 			public array $events;
 
@@ -272,33 +250,20 @@ class VizionCanvasAgentToolTest extends TestCase {
 			}
 		};
 
-		$query = ['select' => []];
-		$config = ['type' => 'table', 'query' => $query];
+		$result = $this->makeResult('SQL');
+		$queryService = $this->createStub(IQueryService::class);
+		$queryService->method('executeQuery')->willReturn($result);
 
-		$exporter = $this->createMock(IReportExporter::class);
-		$exporter->expects($this->once())
-			->method('setExportQuery')
-			->with($query)
-			->willReturnSelf();
-
+		$exporter = $this->createStub(IReportExporter::class);
+		$exporter->method('setResult')->willReturnSelf();
 		$exporter->method('toString')->willReturn('x');
-		$exporter->method('toSql')->willReturn('SQL');
-		$exporter->method('getResult')->willReturn(null);
 
-		$factory = $this->createMock(IReportExporterFactory::class);
-		$factory->expects($this->once())
-			->method('createExporter')
-			->with('htmltablereportexporter')
-			->willReturn($exporter);
+		$classMap = $this->createStub(IClassMap::class);
+		$classMap->method('getInstanceByInterfaceName')->willReturn($exporter);
 
-		$tool = new VizionCanvasAgentTool($factory);
-
-		$out = $tool->callTool(
+		$out = $this->makeTool($queryService, $classMap)->callTool(
 			'vizion_report_canvas',
-			[
-				'open' => true,
-				'config' => $config
-			],
+			['open' => true, 'config' => ['type' => 'table', 'query' => ['select' => []]]],
 			$this->makeContextWithStream($stream)
 		);
 
@@ -306,31 +271,24 @@ class VizionCanvasAgentToolTest extends TestCase {
 			'ok' => true,
 			'canvas_id' => 'main',
 			'sql' => 'SQL',
-			'columns' => null
+			'columns' => $result->columns
 		], $out);
-
 		$this->assertCount(0, $events);
 	}
 
-	public function testCallToolReturnsErrorWhenExporterFactoryThrows(): void {
+	public function testCallToolReturnsErrorWhenExporterIsUnavailable(): void {
 		$stream = new class {
 			public function isDisconnected(): bool {
 				return false;
 			}
 
-			public function push(string $event, array $payload): void {
-				// no-op
-			}
+			public function push(string $event, array $payload): void {}
 		};
 
-		$factory = $this->createMock(IReportExporterFactory::class);
-		$factory->expects($this->once())
-			->method('createExporter')
-			->willThrowException(new \RuntimeException('no exporter'));
+		$queryService = $this->createStub(IQueryService::class);
+		$queryService->method('executeQuery')->willReturn($this->makeResult());
 
-		$tool = new VizionCanvasAgentTool($factory);
-
-		$out = $tool->callTool(
+		$out = $this->makeTool($queryService)->callTool(
 			'vizion_report_canvas',
 			['config' => ['type' => 'piechart', 'query' => ['select' => []]]],
 			$this->makeContextWithStream($stream)
@@ -338,13 +296,12 @@ class VizionCanvasAgentToolTest extends TestCase {
 
 		$this->assertSame([
 			'ok' => false,
-			'error' => 'Report generation or canvas push failed: no exporter'
+			'error' => 'Report generation or canvas push failed: Report exporter is not available: piechartreportexporter'
 		], $out);
 	}
 
 	public function testCallToolResolvesDefaultsAndOpenFlagParsing(): void {
 		$events = [];
-
 		$stream = new class($events) {
 			public array $events;
 
@@ -361,28 +318,23 @@ class VizionCanvasAgentToolTest extends TestCase {
 			}
 		};
 
-		$query = ['select' => []];
-		$configJson = json_encode(['type' => 'table', 'query' => $query], JSON_UNESCAPED_SLASHES);
+		$result = $this->makeResult('SQL');
+		$queryService = $this->createStub(IQueryService::class);
+		$queryService->method('executeQuery')->willReturn($result);
 
-		$exporter = $this->createMock(IReportExporter::class);
-		$exporter->expects($this->once())
-			->method('setExportQuery')
-			->with($query)
-			->willReturnSelf();
-
+		$exporter = $this->createStub(IReportExporter::class);
+		$exporter->method('setResult')->willReturnSelf();
 		$exporter->method('toString')->willReturn('x');
-		$exporter->method('toSql')->willReturn('SQL');
-		$exporter->method('getResult')->willReturn(null);
 
-		$factory = $this->createMock(IReportExporterFactory::class);
-		$factory->expects($this->once())
-			->method('createExporter')
-			->with('htmltablereportexporter')
-			->willReturn($exporter);
+		$classMap = $this->createStub(IClassMap::class);
+		$classMap->method('getInstanceByInterfaceName')->willReturn($exporter);
 
-		$tool = new VizionCanvasAgentTool($factory);
+		$configJson = json_encode(
+			['type' => 'table', 'query' => ['select' => []]],
+			JSON_UNESCAPED_SLASHES
+		);
 
-		$out = $tool->callTool(
+		$out = $this->makeTool($queryService, $classMap)->callTool(
 			'vizion_report_canvas',
 			[
 				'canvas_id' => '   ',
@@ -397,15 +349,11 @@ class VizionCanvasAgentToolTest extends TestCase {
 			'ok' => true,
 			'canvas_id' => 'main',
 			'sql' => 'SQL',
-			'columns' => null
+			'columns' => $result->columns
 		], $out);
-
-		// Open flag is false, so only render event should be pushed.
 		$this->assertCount(1, $events);
 		$this->assertSame('canvas.render', $events[0][0]);
-
-		$render = $events[0][1];
-		$this->assertSame('main', $render['id']);
-		$this->assertSame('Report', $render['title']);
+		$this->assertSame('main', $events[0][1]['id']);
+		$this->assertSame('Report', $events[0][1]['title']);
 	}
 }

@@ -12,13 +12,15 @@ datahawkreportnode
 
 ## Dependency
 
-The node depends directly on:
+The node depends on the neutral reporting contracts:
 
 ```text
-DataHawk\Api\IReportExporterFactory
+ResourceFoundation\Api\IQueryService
+Base3\Api\IClassMap
+ResourceFoundation\Api\IReportExporter
 ```
 
-This is acceptable here because MissionBayReporting is an explicit integration package for DataHawk/Vizion reporting.
+`IQueryService` executes the structured query. `IClassMap` resolves the requested discoverable exporter by its stable `getName()` value, and the exporter transforms the resulting `QueryResult`.
 
 ## Input
 

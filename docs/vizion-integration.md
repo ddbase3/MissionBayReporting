@@ -2,7 +2,29 @@
 
 ## Purpose
 
-This document describes the optional report-to-canvas integration retained in MissionBayReporting.
+This document describes the Vizion integrations in MissionBayReporting.
+
+For model-facing access to finished report data, use `VizionReportAgentTool`. The canvas tool documented below is retained as a separate DataHawk-based visualization path.
+
+## VizionReportAgentTool
+
+Technical name:
+
+```text
+vizionreportagenttool
+```
+
+Tool functions:
+
+```text
+describe_vizion_reports
+execute_vizion_report
+search_vizion_tree
+```
+
+The tool delegates to `Vizion\Api\IReportDataService`, so the agent consumes the same report definition, filters, tree filters, sorting, paging and secured query path as the ModularGrid web report.
+
+See [vizion-report-agent-tool.md](vizion-report-agent-tool.md).
 
 ## VizionCanvasAgentTool
 
@@ -44,7 +66,7 @@ barchart -> barchartreportexporter
 other -> htmltablereportexporter
 ```
 
-The tool delegates to DataHawk `IReportExporterFactory`.
+The tool executes the structured query through `ResourceFoundation\Api\IQueryService` and resolves the configured `ResourceFoundation\Api\IReportExporter` implementation through `IClassMap`.
 
 ## Canvas events
 
@@ -57,7 +79,7 @@ canvas.render
 
 The render event replaces the target canvas with one HTML block containing the report exporter output.
 
-The current implementation marks that HTML block with `sanitize = false` because the DataHawk report exporter is expected to generate trusted HTML. This is an important integration assumption and should be revisited if exporter trust boundaries change.
+The current implementation marks that HTML block with `sanitize = false` because the selected report exporter is expected to generate trusted HTML. This is an important integration assumption and should be revisited if exporter trust boundaries change.
 
 ## Return value
 
@@ -86,4 +108,4 @@ The resource can filter its schema-derived example by domain/category/tag.
 
 ## Recommended use
 
-If the chatbot already supports structured client-side table/chart response extensions, `DataHawkAgentTool` may be enough for data retrieval. Use `VizionCanvasAgentTool` only when the canvas rendering workflow is desired.
+Use `VizionReportAgentTool` for data already represented by a finished Vizion report. Use `DataHawkAgentTool` for ad-hoc analysis. Use `VizionCanvasAgentTool` only when the current DataHawk-based canvas rendering workflow is explicitly desired.

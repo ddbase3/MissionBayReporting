@@ -2,13 +2,68 @@
 
 ## Purpose
 
-`DataHawkAgentTool` is configured as a normal MissionBay component preset.
+`VizionReportAgentTool` and `DataHawkAgentTool` are configured as normal MissionBay component presets.
 
 No separate MissionBayReporting settings group is required for the model-facing tool.
 
+## Vizion report tool
+
+Technical resource name:
+
+```text
+vizionreportagenttool
+```
+
+Use it as the preferred reporting tool when agents should consume finished Vizion reports.
+
+Minimal component preset:
+
+```text
+reporting-vizion
+  type: vizionreportagenttool
+  reportingscope: ilias
+```
+
+Supported settings:
+
+### `reportingscope`
+
+Required exact id from `ResourceFoundation\Api\IReportingScopeRegistry`.
+
+The tool exposes only Vizion report definitions referenced by that reporting scope's `reportScopes`.
+
+### `priority`
+
+Tool catalog priority.
+
+```text
+default = 70
+```
+
+### `describeLimit`
+
+Default maximum candidate count returned by Vizion report discovery.
+
+```text
+default = 10
+maximum = 30
+```
+
+`reportingscope`, `priority` and `describeLimit` are resolved through `IAgentConfigValueResolver`.
+
+## DataHawk tool
+
+Technical resource name:
+
+```text
+datahawkagenttool
+```
+
+Use it for ad-hoc analytical queries that are not represented by a suitable Vizion report.
+
 ## Schema
 
-### `reportingScope`
+### `reportingscope`
 
 Required exact id from `ResourceFoundation\Api\IReportingScopeRegistry`.
 
@@ -69,7 +124,7 @@ default = 1000
 
 ## Late value resolution
 
-`reportingScope` and filters are passed through `IAgentConfigValueResolver`, so normal MissionBay config-value definitions can be used where the tool schema accepts them.
+`reportingscope` and filters are passed through `IAgentConfigValueResolver`, so normal MissionBay config-value definitions can be used where the tool schema accepts them.
 
 This allows project-specific scope values without adding a reporting-specific resolver.
 
@@ -82,11 +137,11 @@ Example:
 ```text
 reporting-users
   type: datahawkagenttool
-  reportingScope: users
+  reportingscope: users
 
 reporting-ai-usage
   type: datahawkagenttool
-  reportingScope: ai-usage
+  reportingscope: ai-usage
 ```
 
 Do not create a new routing/profile layer just to distinguish these tool instances. The component preset ID already provides configured instance identity.

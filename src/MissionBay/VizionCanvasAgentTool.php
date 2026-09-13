@@ -17,19 +17,19 @@
 
 namespace MissionBayReporting\MissionBay;
 
-use DataHawk\Api\IReportExporterFactory;
-use MissionBay\Api\IAgentTool;
 use AssistantFoundation\Api\IAgentContext;
+use Base3\Api\IClassMap;
+use MissionBay\Api\IAgentTool;
 use MissionBay\Resource\AbstractAgentResource;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IReportExporter;
 
 class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool {
 
-	/** @var IReportExporterFactory */
-	private IReportExporterFactory $reportExporterFactory;
-
-	public function __construct(IReportExporterFactory $reportExporterFactory) {
-		$this->reportExporterFactory = $reportExporterFactory;
-	}
+	public function __construct(
+		private readonly IQueryService $queryService,
+		private readonly IClassMap $classMap
+	) {}
 
 	public static function getName(): string {
 		return 'vizioncanvasagenttool';
@@ -77,25 +77,31 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 
 	public function callTool(string $toolName, array $arguments, IAgentContext $context): array {
 
-		if ($toolName !== 'vizion_report_canvas') {
+		if($toolName !== 'vizion_report_canvas') {
 			throw new \InvalidArgumentException("Unsupported tool: {$toolName}");
 		}
 
 		$canvasId = $this->resolveCanvasId($arguments);
 		$title = $this->resolveTitle($arguments);
 		$open = $this->resolveOpenFlag($arguments);
-
 		$config = $this->resolveConfig($arguments);
 
-		if (!isset($config['type']) || !isset($config['query'])) {
+		if(!isset($config['type']) || !isset($config['query'])) {
 			return [
 				'ok' => false,
 				'error' => 'Missing "type" or "query" in report config.'
 			];
 		}
 
+		if(!is_array($config['query'])) {
+			return [
+				'ok' => false,
+				'error' => 'Invalid "query" in report config.'
+			];
+		}
+
 		$stream = $context->getVar('eventstream');
-		if (!$stream) {
+		if(!$stream) {
 			return [
 				'ok' => false,
 				'error' => 'Missing eventstream in context.'
@@ -104,20 +110,17 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 
 		try {
 			$exporterType = $this->mapExporterType((string)$config['type']);
+			$result = $this->queryService->executeQuery($config['query']);
+			$exporter = $this->classMap->getInstanceByInterfaceName(IReportExporter::class, $exporterType);
 
-			$exporter = $this->reportExporterFactory->createExporter($exporterType);
-			$exporter->setExportQuery($config['query']);
-
-			$reportHtml = $exporter->toString();
-			$sql = $exporter->toSql();
-
-			$columns = null;
-			$result = $exporter->getResult();
-			if ($result !== null) {
-				$columns = $result->columns;
+			if(!$exporter instanceof IReportExporter) {
+				throw new \RuntimeException('Report exporter is not available: ' . $exporterType);
 			}
 
-			if ($open && !$stream->isDisconnected()) {
+			$exporter->setResult($result);
+			$reportHtml = $exporter->toString();
+
+			if($open && !$stream->isDisconnected()) {
 				$stream->push('canvas.open', [
 					'id' => $canvasId,
 					'title' => $title,
@@ -125,7 +128,7 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 				]);
 			}
 
-			if (!$stream->isDisconnected()) {
+			if(!$stream->isDisconnected()) {
 				$stream->push('canvas.render', [
 					'id' => $canvasId,
 					'mode' => 'replace',
@@ -133,8 +136,8 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 					'blocks' => [
 						[
 							'type' => 'html',
-							'html' => '<div>'.$reportHtml.'</div>',
-							// report exporter already generates trusted HTML
+							'html' => '<div>' . $reportHtml . '</div>',
+							// Report exporter already generates trusted HTML.
 							'sanitize' => false
 						]
 					]
@@ -144,11 +147,11 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 			return [
 				'ok' => true,
 				'canvas_id' => $canvasId,
-				'sql' => $sql,
-				'columns' => $columns
+				'sql' => $result->debugSql,
+				'columns' => $result->columns
 			];
-
-		} catch (\Throwable $e) {
+		}
+		catch(\Throwable $e) {
 			return [
 				'ok' => false,
 				'error' => 'Report generation or canvas push failed: ' . $e->getMessage()
@@ -158,7 +161,7 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 
 	private function resolveCanvasId(array $arguments): string {
 		$canvasId = trim((string)($arguments['canvas_id'] ?? 'main'));
-		if ($canvasId === '') {
+		if($canvasId === '') {
 			$canvasId = 'main';
 		}
 		return $canvasId;
@@ -166,7 +169,7 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 
 	private function resolveTitle(array $arguments): string {
 		$title = trim((string)($arguments['title'] ?? 'Report'));
-		if ($title === '') {
+		if($title === '') {
 			$title = 'Report';
 		}
 		return $title;
@@ -184,15 +187,15 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 	private function resolveConfig(array $arguments): array {
 		$config = $arguments['config'] ?? null;
 
-		if (is_string($config)) {
+		if(is_string($config)) {
 			$decoded = json_decode($config, true);
-			if (!is_array($decoded)) {
+			if(!is_array($decoded)) {
 				throw new \InvalidArgumentException('Could not parse config JSON.');
 			}
 			return $decoded;
 		}
 
-		if (!is_array($config)) {
+		if(!is_array($config)) {
 			throw new \InvalidArgumentException('Missing or invalid "config" argument.');
 		}
 
@@ -202,7 +205,7 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 	private function mapExporterType(string $type): string {
 		$type = strtolower($type);
 
-		return match ($type) {
+		return match($type) {
 			'table' => 'htmltablereportexporter',
 			'datatable' => 'datatablereportexporter',
 			'piechart' => 'piechartreportexporter',

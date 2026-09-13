@@ -8,15 +8,28 @@ Current source classes:
 
 ```text
 MissionBayReportingPlugin
+VizionReportAgentTool
 DataHawkAgentTool
 VizionCanvasAgentTool
 VizionMemoryAgentResource
 DataHawkReportNode
 ```
 
-## Current preferred model-facing path
+## Preferred curated-report path
 
-The preferred reporting path for an agent is:
+When the requested data already exists as a Vizion report:
+
+```text
+VizionReportAgentTool
+  -> Vizion IReportDataService
+  -> ResourceFoundation IQueryService
+```
+
+This path keeps the report vdef, filters, tree filters and backend security identical to the web report.
+
+## Ad-hoc analytical path
+
+When no suitable Vizion report exists:
 
 ```text
 DataHawkAgentTool
@@ -33,14 +46,15 @@ When a chatbot/canvas environment is available:
 
 ```text
 VizionCanvasAgentTool
-  -> DataHawk exporter
+  -> ResourceFoundation IQueryService
+  -> IClassMap / IReportExporter
   -> eventstream
   -> canvas.open / canvas.render
 ```
 
 ## Legacy/flow path
 
-`DataHawkReportNode` remains available for AgentFlow definitions that construct rendered reports through `IReportExporterFactory`.
+`DataHawkReportNode` remains available for AgentFlow definitions that execute structured queries through `IQueryService` and render the resulting `QueryResult` through discoverable `IReportExporter` implementations.
 
 ## Discovery
 
