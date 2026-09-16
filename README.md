@@ -248,6 +248,8 @@ See [docs/report-node.md](docs/report-node.md).
 * [docs/vizion-integration.md](docs/vizion-integration.md)
 * [docs/report-node.md](docs/report-node.md)
 * [docs/api-reference.md](docs/api-reference.md)
+* [docs/faq.md](docs/faq.md)
+* [PRIVACY.md](PRIVACY.md)
 
 ## Design rules
 
