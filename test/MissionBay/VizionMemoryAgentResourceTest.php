@@ -2,6 +2,7 @@
 
 namespace Test\MissionBayReporting\MissionBay;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use MissionBayReporting\MissionBay\VizionMemoryAgentResource;
 use MissionBay\Api\IAgentConfigValueResolver;
@@ -9,9 +10,7 @@ use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Dto\TableMetadata;
 use ResourceFoundation\Dto\FieldMetadata;
 
-/**
- * @covers \MissionBayReporting\MissionBay\VizionMemoryAgentResource
- */
+#[CoversClass(\MissionBayReporting\MissionBay\VizionMemoryAgentResource::class)]
 class VizionMemoryAgentResourceTest extends TestCase {
 
 	private function makeResolverPassthrough(): IAgentConfigValueResolver {

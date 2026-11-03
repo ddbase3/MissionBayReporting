@@ -5,14 +5,13 @@ namespace Test\MissionBayReporting\MissionBay;
 use AssistantFoundation\Api\IAgentContext;
 use Base3\Api\IClassMap;
 use MissionBayReporting\MissionBay\VizionCanvasAgentTool;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use ResourceFoundation\Api\IQueryService;
 use ResourceFoundation\Api\IReportExporter;
 use ResourceFoundation\Dto\QueryResult;
 
-/**
- * @covers \MissionBayReporting\MissionBay\VizionCanvasAgentTool
- */
+#[CoversClass(\MissionBayReporting\MissionBay\VizionCanvasAgentTool::class)]
 class VizionCanvasAgentToolTest extends TestCase {
 
 	private function makeContextWithStream(object $stream): IAgentContext {

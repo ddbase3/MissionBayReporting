@@ -5,6 +5,7 @@ namespace Test\MissionBayReporting\MissionBay;
 use AssistantFoundation\Api\IAgentContext;
 use MissionBay\Api\IAgentConfigValueResolver;
 use MissionBayReporting\MissionBay\DataHawkAgentTool;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use ResourceFoundation\Api\IQueryService;
 use ResourceFoundation\Api\IScopedQuerySchemaProvider;
@@ -12,9 +13,7 @@ use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\QueryResult;
 use ResourceFoundation\Dto\TableMetadata;
 
-/**
- * @covers \MissionBayReporting\MissionBay\DataHawkAgentTool
- */
+#[CoversClass(\MissionBayReporting\MissionBay\DataHawkAgentTool::class)]
 final class DataHawkAgentToolTest extends TestCase {
 
 	private const REPORTING_SCOPE = 'learning';
