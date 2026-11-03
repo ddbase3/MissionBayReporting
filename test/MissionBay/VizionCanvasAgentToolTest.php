@@ -112,13 +112,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 	}
 
 	public function testCallToolReturnsErrorWhenTypeOrQueryMissingInConfig(): void {
-		$stream = new class {
-			public function isDisconnected(): bool {
-				return false;
-			}
-
-			public function push(string $event, array $payload): void {}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble1();
 
 		$out = $this->makeTool()->callTool(
 			'vizion_report_canvas',
@@ -133,13 +127,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 	}
 
 	public function testCallToolReturnsErrorWhenQueryIsInvalid(): void {
-		$stream = new class {
-			public function isDisconnected(): bool {
-				return false;
-			}
-
-			public function push(string $event, array $payload): void {}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble2();
 
 		$out = $this->makeTool()->callTool(
 			'vizion_report_canvas',
@@ -168,21 +156,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 
 	public function testCallToolExecutesQueryRendersExporterAndPushesCanvas(): void {
 		$events = [];
-		$stream = new class($events) {
-			public array $events;
-
-			public function __construct(array &$events) {
-				$this->events = &$events;
-			}
-
-			public function isDisconnected(): bool {
-				return false;
-			}
-
-			public function push(string $event, array $payload): void {
-				$this->events[] = [$event, $payload];
-			}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble3($events);
 
 		$query = ['select' => [['type' => 'fld', 'table' => 't', 'field' => 'id']]];
 		$result = $this->makeResult();
@@ -234,21 +208,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 
 	public function testCallToolDoesNotPushWhenDisconnected(): void {
 		$events = [];
-		$stream = new class($events) {
-			public array $events;
-
-			public function __construct(array &$events) {
-				$this->events = &$events;
-			}
-
-			public function isDisconnected(): bool {
-				return true;
-			}
-
-			public function push(string $event, array $payload): void {
-				$this->events[] = [$event, $payload];
-			}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble4($events);
 
 		$result = $this->makeResult('SQL');
 		$queryService = $this->createStub(IQueryService::class);
@@ -277,13 +237,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 	}
 
 	public function testCallToolReturnsErrorWhenExporterIsUnavailable(): void {
-		$stream = new class {
-			public function isDisconnected(): bool {
-				return false;
-			}
-
-			public function push(string $event, array $payload): void {}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble5();
 
 		$queryService = $this->createStub(IQueryService::class);
 		$queryService->method('executeQuery')->willReturn($this->makeResult());
@@ -302,21 +256,7 @@ class VizionCanvasAgentToolTest extends TestCase {
 
 	public function testCallToolResolvesDefaultsAndOpenFlagParsing(): void {
 		$events = [];
-		$stream = new class($events) {
-			public array $events;
-
-			public function __construct(array &$events) {
-				$this->events = &$events;
-			}
-
-			public function isDisconnected(): bool {
-				return false;
-			}
-
-			public function push(string $event, array $payload): void {
-				$this->events[] = [$event, $payload];
-			}
-		};
+		$stream = new VizionCanvasAgentToolTestDouble6($events);
 
 		$result = $this->makeResult('SQL');
 		$queryService = $this->createStub(IQueryService::class);
@@ -357,3 +297,15 @@ class VizionCanvasAgentToolTest extends TestCase {
 		$this->assertSame('Report', $events[0][1]['title']);
 	}
 }
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble1.php';
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble2.php';
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble3.php';
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble4.php';
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble5.php';
+
+require_once __DIR__ . '/VizionCanvasAgentToolTestDouble6.php';

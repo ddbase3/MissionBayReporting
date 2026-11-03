@@ -7,11 +7,9 @@ use MissionBay\Api\IAgentConfigValueResolver;
 use MissionBayReporting\MissionBay\DataHawkAgentTool;
 use PHPUnit\Framework\TestCase;
 use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IReportingScopeRegistry;
 use ResourceFoundation\Api\IScopedQuerySchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\QueryResult;
-use ResourceFoundation\Dto\ReportingScopeDefinition;
 use ResourceFoundation\Dto\TableMetadata;
 
 /**
@@ -56,24 +54,6 @@ final class DataHawkAgentToolTest extends TestCase {
 	}
 
 	/**
-	 * @param string[] $querySchemaScopes
-	 */
-	private function makeReportingScopeRegistry(array $querySchemaScopes): IReportingScopeRegistry {
-		$definition = new ReportingScopeDefinition(
-			id: self::REPORTING_SCOPE,
-			label: 'Learning',
-			querySchemaScopes: $querySchemaScopes
-		);
-
-		$registry = $this->createStub(IReportingScopeRegistry::class);
-		$registry->method('getScopes')->willReturn([$definition]);
-		$registry->method('get')->willReturnCallback(
-			fn(string $id): ?ReportingScopeDefinition => $id === self::REPORTING_SCOPE ? $definition : null
-		);
-		return $registry;
-	}
-
-	/**
 	 * @param array<string,TableMetadata[]> $schemas
 	 * @param string[]|null $querySchemaScopes
 	 * @param array<string,mixed> $config
@@ -85,15 +65,19 @@ final class DataHawkAgentToolTest extends TestCase {
 		array $config = []
 	): DataHawkAgentTool {
 		$querySchemaScopes ??= array_keys($schemas);
+		$visibleTables = [];
+		foreach ($schemas as $scope => $tables) {
+			if (in_array($scope, $querySchemaScopes, true)) {
+				array_push($visibleTables, ...$tables);
+			}
+		}
+		$queryService->method('listTables')->willReturn($visibleTables);
 		$tool = new DataHawkAgentTool(
 			$queryService,
 			$this->makeSchemaProvider($schemas),
-			$this->makeReportingScopeRegistry($querySchemaScopes),
 			$this->makeResolver()
 		);
-		$tool->setConfig(array_merge([
-			'reportingScope' => self::REPORTING_SCOPE
-		], $config));
+		$tool->setConfig($config);
 		return $tool;
 	}
 
@@ -145,23 +129,23 @@ final class DataHawkAgentToolTest extends TestCase {
 		$this->assertSame('execute_datahawk_query', $definitions[1]['function']['name']);
 		$this->assertTrue($definitions[0]['readOnlyHint']);
 		$this->assertTrue($definitions[1]['readOnlyHint']);
-		$this->assertArrayHasKey('schema', $definitions[0]['function']['parameters']['properties']);
+		$this->assertSame(['topic', 'search', 'table', 'limit'], array_keys($definitions[0]['function']['parameters']['properties']));
+		$this->assertArrayNotHasKey('schema', $definitions[0]['function']['parameters']['properties']);
 		$this->assertSame('object', $definitions[1]['function']['parameters']['properties']['query']['type']);
 		$this->assertSame(['query'], $definitions[1]['function']['parameters']['required']);
 	}
 
-	public function testSchemaRequiresReportingScopeConfiguration(): void {
+	public function testSchemaUsesDirectReportingTableFilters(): void {
 		$tool = new DataHawkAgentTool(
 			$this->createStub(IQueryService::class),
 			$this->makeSchemaProvider([self::USER_SCHEMA => []]),
-			$this->makeReportingScopeRegistry([self::USER_SCHEMA]),
 			$this->makeResolver()
 		);
 		$schema = $tool->getSchema();
 
 		$this->assertSame('object', $schema['type']);
-		$this->assertArrayHasKey('reportingScope', $schema['properties']);
-		$this->assertContains('reportingScope', $schema['required']);
+		$this->assertSame([], $schema['required']);
+		$this->assertArrayHasKey('priority', $schema['properties']);
 		$this->assertArrayHasKey('domainFilter', $schema['properties']);
 		$this->assertArrayHasKey('categoryFilter', $schema['properties']);
 		$this->assertArrayHasKey('tagFilter', $schema['properties']);
@@ -170,17 +154,18 @@ final class DataHawkAgentToolTest extends TestCase {
 		$this->assertArrayHasKey('maxLimit', $schema['properties']);
 	}
 
-	public function testConfigRejectsUnknownReportingScope(): void {
-		$tool = new DataHawkAgentTool(
+	public function testConfigurationFiltersKnownTablesWithoutReportingScopeRegistry(): void {
+		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
-			$this->makeSchemaProvider([self::USER_SCHEMA => []]),
-			$this->makeReportingScopeRegistry([self::USER_SCHEMA]),
-			$this->makeResolver()
+			[self::USER_SCHEMA => [$this->makeUserTable()], self::COURSE_SCHEMA => [$this->makeCourseTable()]],
+			null,
+			['tagFilter' => ['course']]
 		);
 
-		$this->expectException(\InvalidArgumentException::class);
-		$this->expectExceptionMessage('Unknown reportingScope');
-		$tool->setConfig(['reportingScope' => 'unknown']);
+		$result = $tool->callTool('describe_reporting_data', [], $this->makeContextStub());
+		$this->assertTrue($result['ok']);
+		$this->assertSame(1, $result['available_table_count']);
+		$this->assertSame('course_report_rows', $result['tables'][0]['name']);
 	}
 
 	public function testDescribeSearchReturnsExactSchemaAndTable(): void {
@@ -200,20 +185,19 @@ final class DataHawkAgentToolTest extends TestCase {
 
 		$this->assertTrue($result['ok']);
 		$this->assertSame('search', $result['mode']);
-		$this->assertSame(self::REPORTING_SCOPE, $result['reporting_scope']['id']);
-		$this->assertSame(self::USER_SCHEMA, $result['tables'][0]['schema']);
+		$this->assertArrayNotHasKey('reporting_scope', $result);
 		$this->assertSame('user_report_rows', $result['tables'][0]['name']);
 		$this->assertNotEmpty($result['tables'][0]['matched_fields']);
 		$this->assertContains('firstname', $result['tables'][0]['field_names']);
 		$this->assertArrayNotHasKey('query_rules', $result);
 	}
 
-	public function testDescribeKeepsDuplicateLocalTableNamesSeparatedBySchema(): void {
+	public function testCatalogIncludesTablesFromDifferentVisibleQueryScopes(): void {
 		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
 			[
-				self::USER_SCHEMA => [$this->makeUserTable('report_rows')],
-				self::COURSE_SCHEMA => [$this->makeCourseTable('report_rows')]
+				self::USER_SCHEMA => [$this->makeUserTable()],
+				self::COURSE_SCHEMA => [$this->makeCourseTable()]
 			]
 		);
 
@@ -222,11 +206,10 @@ final class DataHawkAgentToolTest extends TestCase {
 		$this->assertTrue($result['ok']);
 		$this->assertSame(2, $result['available_table_count']);
 		$this->assertCount(2, $result['tables']);
-		$this->assertSame(['courses', 'users'], array_values(array_unique(array_column($result['tables'], 'schema'))));
-		$this->assertSame(['report_rows', 'report_rows'], array_column($result['tables'], 'name'));
+		$this->assertSame(['course_report_rows', 'user_report_rows'], array_column($result['tables'], 'name'));
 	}
 
-	public function testDescribeExactTableRequiresSchema(): void {
+	public function testDescribeExactTableDoesNotRequireQuerySchema(): void {
 		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
 			[self::USER_SCHEMA => [$this->makeUserTable()]]
@@ -238,12 +221,12 @@ final class DataHawkAgentToolTest extends TestCase {
 			$this->makeContextStub()
 		);
 
-		$this->assertFalse($result['ok']);
-		$this->assertSame('describe_failed', $result['error']['code']);
-		$this->assertStringContainsString('schema is required', $result['error']['message']);
+		$this->assertTrue($result['ok']);
+		$this->assertSame('table', $result['mode']);
+		$this->assertSame('user_report_rows', $result['table']['name']);
 	}
 
-	public function testDescribeUnknownTableReturnsScopedAlternatives(): void {
+	public function testDescribeUnknownTableReturnsAvailableTableNameSuggestions(): void {
 		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
 			[self::USER_SCHEMA => [$this->makeUserTable()]]
@@ -251,17 +234,16 @@ final class DataHawkAgentToolTest extends TestCase {
 
 		$result = $tool->callTool(
 			'describe_reporting_data',
-			['schema' => self::USER_SCHEMA, 'table' => 'usr_data'],
+			['table' => 'usr_data'],
 			$this->makeContextStub()
 		);
 
 		$this->assertFalse($result['ok']);
 		$this->assertSame('table_not_available', $result['error']['code']);
-		$this->assertSame(self::USER_SCHEMA, $result['suggestions'][0]['schema']);
-		$this->assertSame('user_report_rows', $result['suggestions'][0]['table']);
+		$this->assertSame('user_report_rows', $result['suggestions'][0]);
 	}
 
-	public function testDescribeExactTableReturnsSchemaAndQueryExample(): void {
+	public function testDescribeExactTableReturnsFieldMetadataAndQueryExample(): void {
 		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
 			[self::USER_SCHEMA => [$this->makeUserTable()]]
@@ -269,14 +251,13 @@ final class DataHawkAgentToolTest extends TestCase {
 
 		$result = $tool->callTool(
 			'describe_reporting_data',
-			['schema' => self::USER_SCHEMA, 'table' => 'user_report_rows'],
+			['table' => 'user_report_rows'],
 			$this->makeContextStub()
 		);
 
 		$this->assertTrue($result['ok']);
 		$this->assertSame('table', $result['mode']);
-		$this->assertSame(self::USER_SCHEMA, $result['table']['schema']);
-		$this->assertSame(self::USER_SCHEMA, $result['query_example']['schema']);
+		$this->assertSame('user_report_rows', $result['query_example']['table']);
 		$this->assertSame('user_report_rows', $result['table']['name']);
 
 		$fieldNames = array_column($result['table']['fields'], 'name');
@@ -285,7 +266,7 @@ final class DataHawkAgentToolTest extends TestCase {
 		$this->assertContains('email', $fieldNames);
 	}
 
-	public function testConfigFiltersTablesInsideReportingScope(): void {
+	public function testConfigTableFilterRestrictsListedTables(): void {
 		$tool = $this->makeTool(
 			$this->createStub(IQueryService::class),
 			[
@@ -300,7 +281,6 @@ final class DataHawkAgentToolTest extends TestCase {
 
 		$this->assertTrue($result['ok']);
 		$this->assertSame(1, $result['available_table_count']);
-		$this->assertSame(self::USER_SCHEMA, $result['tables'][0]['schema']);
 		$this->assertSame('user_report_rows', $result['tables'][0]['name']);
 	}
 
@@ -349,29 +329,29 @@ final class DataHawkAgentToolTest extends TestCase {
 		$this->assertSame(100, $result['limit']);
 	}
 
-	public function testQueryRejectsMissingSchemaBeforeExecution(): void {
+	public function testQueryInfersUnambiguousSchemaBeforeExecution(): void {
 		$service = $this->createMock(IQueryService::class);
-		$service->expects($this->never())->method('executeQuery');
+		$service->expects($this->once())->method('executeQuery')
+			->with($this->callback(static fn(array $query): bool =>
+				($query['schema'] ?? null) === self::USER_SCHEMA
+				&& ($query['table'] ?? null) === 'user_report_rows'
+			))
+			->willReturn(new QueryResult(columns: [], rows: [['usr_id' => 42]]));
 		$tool = $this->makeTool($service, [self::USER_SCHEMA => [$this->makeUserTable()]]);
 
-		$result = $tool->callTool(
-			'execute_datahawk_query',
-			['query' => [
-				'type' => 'select',
-				'table' => 'user_report_rows',
-				'fields' => [[
-					'element' => ['type' => 'fld', 'table' => 'user_report_rows', 'field' => 'usr_id']
-				]]
-			]],
-			$this->makeContextStub()
-		);
+		$result = $tool->callTool('execute_datahawk_query', ['query' => [
+			'type' => 'select',
+			'table' => 'user_report_rows',
+			'fields' => [[
+				'element' => ['type' => 'fld', 'table' => 'user_report_rows', 'field' => 'usr_id']
+			]]
+		]], $this->makeContextStub());
 
-		$this->assertFalse($result['ok']);
-		$this->assertSame('invalid_query', $result['error']['code']);
-		$this->assertStringContainsString('schema is required', $result['error']['message']);
+		$this->assertTrue($result['ok']);
+		$this->assertSame(1, $result['count']);
 	}
 
-	public function testQueryRejectsSchemaOutsideConfiguredReportingScope(): void {
+	public function testQueryRejectsTableOutsideVisibleQueryServiceTables(): void {
 		$service = $this->createMock(IQueryService::class);
 		$service->expects($this->never())->method('executeQuery');
 		$tool = $this->makeTool(
@@ -397,10 +377,10 @@ final class DataHawkAgentToolTest extends TestCase {
 		);
 
 		$this->assertFalse($result['ok']);
-		$this->assertStringContainsString('schema is not available in reporting scope', $result['error']['message']);
+		$this->assertStringContainsString('table is not available in this reporting preset', $result['error']['message']);
 	}
 
-	public function testQueryRejectsProviderAlias(): void {
+	public function testQueryRejectsUnsafeProviderIdentifier(): void {
 		$service = $this->createMock(IQueryService::class);
 		$service->expects($this->never())->method('executeQuery');
 		$tool = $this->makeTool($service, [self::USER_SCHEMA => [$this->makeUserTable()]]);
@@ -410,7 +390,7 @@ final class DataHawkAgentToolTest extends TestCase {
 			['query' => [
 				'type' => 'select',
 				'schema' => self::USER_SCHEMA,
-				'provider' => self::USER_SCHEMA,
+				'provider' => '../unsafe',
 				'table' => 'user_report_rows',
 				'fields' => [[
 					'element' => ['type' => 'fld', 'table' => 'user_report_rows', 'field' => 'usr_id']
@@ -420,7 +400,7 @@ final class DataHawkAgentToolTest extends TestCase {
 		);
 
 		$this->assertFalse($result['ok']);
-		$this->assertStringContainsString('provider is not part of the agent reporting contract', $result['error']['message']);
+		$this->assertStringContainsString('invalid technical name', $result['error']['message']);
 	}
 
 	public function testQueryRejectsJsonStringInput(): void {
