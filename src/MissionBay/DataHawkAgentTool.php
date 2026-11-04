@@ -1405,7 +1405,7 @@ final class DataHawkAgentTool extends AbstractAgentResource implements IAgentToo
 		if ($value === null || $value === '') {
 			return;
 		}
-		if (!is_string($value) || preg_match('/^[A-Za-z0-9_.-]+$/', $value) !== 1) {
+		if (!is_string($value) || preg_match('/\A[A-Za-z0-9_.-]+\z/', $value) !== 1) {
 			throw new \InvalidArgumentException($path . ' contains an invalid technical name.');
 		}
 	}

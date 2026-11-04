@@ -29,7 +29,9 @@ class DataHawkReportNode extends AbstractAgentNode {
 	public function __construct(
 		private readonly IQueryService $queryService,
 		private readonly IClassMap $classMap
-	) {}
+	) {
+		parent::__construct();
+	}
 
 	public static function getName(): string {
 		return 'datahawkreportnode';

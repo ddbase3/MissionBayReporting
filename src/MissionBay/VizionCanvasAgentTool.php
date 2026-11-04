@@ -29,7 +29,9 @@ class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool 
 	public function __construct(
 		private readonly IQueryService $queryService,
 		private readonly IClassMap $classMap
-	) {}
+	) {
+		parent::__construct();
+	}
 
 	public static function getName(): string {
 		return 'vizioncanvasagenttool';
