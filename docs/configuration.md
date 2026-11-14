@@ -28,7 +28,7 @@ Supported settings:
 
 ### `reportingscope`
 
-Required exact id from `ResourceFoundation\Api\IReportingScopeRegistry`.
+Required exact id from `Base3\ResourceFoundation\Api\IReportingScopeRegistry`.
 
 The tool exposes only Vizion report definitions referenced by that reporting scope's `reportScopes`.
 
@@ -65,7 +65,7 @@ Use it for ad-hoc analytical queries that are not represented by a suitable Vizi
 
 ### `reportingscope`
 
-Required exact id from `ResourceFoundation\Api\IReportingScopeRegistry`.
+Required exact id from `Base3\ResourceFoundation\Api\IReportingScopeRegistry`.
 
 The reporting scope defines which technical query-schema scopes belong to this tool instance. Schema discovery and query validation are restricted to those scopes.
 

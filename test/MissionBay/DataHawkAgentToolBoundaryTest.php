@@ -1,18 +1,33 @@
 <?php declare(strict_types=1);
 
-namespace Test\MissionBayReporting\MissionBay;
+/***********************************************************************
+ * This file is part of MissionBayReporting for BASE3 Framework.
+ *
+ * MissionBayReporting extends BASE3 with agent-oriented reporting tools.
+ * It integrates MissionBay conversations with DataHawk and Vizion.
+ * The tools provide query execution and visual report rendering.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/missionbayreporting
+ * https://github.com/ddbase3/MissionBayReporting
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAgentContext;
-use MissionBay\Api\IAgentConfigValueResolver;
-use MissionBayReporting\MissionBay\DataHawkAgentTool;
+namespace Base3\MissionBayReporting\Test\MissionBay;
+
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\MissionBay\Api\IAgentConfigValueResolver;
+use Base3\MissionBayReporting\MissionBay\DataHawkAgentTool;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IScopedQuerySchemaProvider;
-use ResourceFoundation\Dto\FieldMetadata;
-use ResourceFoundation\Dto\JoinMetadata;
-use ResourceFoundation\Dto\QueryResult;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use Base3\ResourceFoundation\Dto\FieldMetadata;
+use Base3\ResourceFoundation\Dto\JoinMetadata;
+use Base3\ResourceFoundation\Dto\QueryResult;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 #[CoversClass(DataHawkAgentTool::class)]
 final class DataHawkAgentToolBoundaryTest extends TestCase {

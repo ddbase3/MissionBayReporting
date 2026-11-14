@@ -15,14 +15,14 @@
  * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting\MissionBay;
+namespace Base3\MissionBayReporting\MissionBay;
 
-use AssistantFoundation\Api\IAgentContext;
-use Base3\Api\IClassMap;
-use MissionBay\Api\IAgentTool;
-use MissionBay\Resource\AbstractAgentResource;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IReportExporter;
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\MissionBay\Api\IAgentTool;
+use Base3\MissionBay\Resource\AbstractAgentResource;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Api\IReportExporter;
 
 class VizionCanvasAgentTool extends AbstractAgentResource implements IAgentTool {
 

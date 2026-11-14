@@ -71,8 +71,8 @@ The current classes operate on data returned by injected services and return or 
 It depends on:
 
 ```text
-Vizion\Api\IReportDataService
-MissionBay\Api\IAgentConfigValueResolver
+Base3\Vizion\Api\IReportDataService
+Base3\MissionBay\Api\IAgentConfigValueResolver
 ```
 
 The tool does not build a low-level query AST itself. It asks Vizion to describe, search, and execute a configured report.
@@ -174,8 +174,8 @@ Other visual display types should not be assumed to be executable through the sa
 It depends on the neutral ResourceFoundation query contracts:
 
 ```text
-ResourceFoundation\Api\IQueryService
-ResourceFoundation\Api\IScopedQuerySchemaProvider
+Base3\ResourceFoundation\Api\IQueryService
+Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider
 ```
 
 It also uses `IAgentConfigValueResolver` for configurable filters and limits.

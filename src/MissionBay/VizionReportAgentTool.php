@@ -15,15 +15,15 @@
  * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting\MissionBay;
+namespace Base3\MissionBayReporting\MissionBay;
 
-use AssistantFoundation\Api\IAgentContext;
-use Base3\Api\IOutputSchemaProvider;
-use Base3\Api\ISchemaProvider;
-use MissionBay\Api\IAgentConfigValueResolver;
-use MissionBay\Api\IAgentTool;
-use MissionBay\Resource\AbstractAgentResource;
-use Vizion\Api\IReportDataService;
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\CoreFoundation\Api\IOutputSchemaProvider;
+use Base3\CoreFoundation\Api\ISchemaProvider;
+use Base3\MissionBay\Api\IAgentConfigValueResolver;
+use Base3\MissionBay\Api\IAgentTool;
+use Base3\MissionBay\Resource\AbstractAgentResource;
+use Base3\Vizion\Api\IReportDataService;
 
 /**
  * Read-only access to curated Vizion reports.

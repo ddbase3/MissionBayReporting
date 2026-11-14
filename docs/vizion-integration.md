@@ -22,7 +22,7 @@ execute_vizion_report
 search_vizion_tree
 ```
 
-The tool delegates to `Vizion\Api\IReportDataService`, so the agent consumes the same report definition, filters, tree filters, sorting, paging and secured query path as the ModularGrid web report.
+The tool delegates to `Base3\Vizion\Api\IReportDataService`, so the agent consumes the same report definition, filters, tree filters, sorting, paging and secured query path as the ModularGrid web report.
 
 See [vizion-report-agent-tool.md](vizion-report-agent-tool.md).
 
@@ -66,7 +66,7 @@ barchart -> barchartreportexporter
 other -> htmltablereportexporter
 ```
 
-The tool executes the structured query through `ResourceFoundation\Api\IQueryService` and resolves the configured `ResourceFoundation\Api\IReportExporter` implementation through `IClassMap`.
+The tool executes the structured query through `Base3\ResourceFoundation\Api\IQueryService` and resolves the configured `Base3\ResourceFoundation\Api\IReportExporter` implementation through `IClassMap`.
 
 ## Canvas events
 

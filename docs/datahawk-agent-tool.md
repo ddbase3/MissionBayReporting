@@ -9,18 +9,18 @@
 The class implements:
 
 ```text
-MissionBay\Api\IAgentTool
-Base3\Api\ISchemaProvider
-Base3\Api\IOutputSchemaProvider
+Base3\MissionBay\Api\IAgentTool
+Base3\CoreFoundation\Api\ISchemaProvider
+Base3\CoreFoundation\Api\IOutputSchemaProvider
 ```
 
 It consumes:
 
 ```text
-ResourceFoundation\Api\IQueryService
-ResourceFoundation\Api\IReportingScopeRegistry
-ResourceFoundation\Api\IScopedQuerySchemaProvider
-MissionBay\Api\IAgentConfigValueResolver
+Base3\ResourceFoundation\Api\IQueryService
+Base3\ResourceFoundation\Api\IReportingScopeRegistry
+Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider
+Base3\MissionBay\Api\IAgentConfigValueResolver
 ```
 
 ## Technical name

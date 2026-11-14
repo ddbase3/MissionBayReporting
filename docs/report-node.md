@@ -15,9 +15,9 @@ datahawkreportnode
 The node depends on the neutral reporting contracts:
 
 ```text
-ResourceFoundation\Api\IQueryService
-Base3\Api\IClassMap
-ResourceFoundation\Api\IReportExporter
+Base3\ResourceFoundation\Api\IQueryService
+Base3\CoreFoundation\Api\IClassMap
+Base3\ResourceFoundation\Api\IReportExporter
 ```
 
 `IQueryService` executes the structured query. `IClassMap` resolves the requested discoverable exporter by its stable `getName()` value, and the exporter transforms the resulting `QueryResult`.

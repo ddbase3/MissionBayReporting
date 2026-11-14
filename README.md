@@ -27,7 +27,7 @@ flowchart TD
 The important current boundary is that `DataHawkAgentTool` does not depend on a concrete DataHawk query implementation for data access. It depends on:
 
 ```text
-ResourceFoundation\Api\IQueryService
+Base3\ResourceFoundation\Api\IQueryService
 ```
 
 This keeps the agent tool reusable with any project implementation that fills the ResourceFoundation query slot.

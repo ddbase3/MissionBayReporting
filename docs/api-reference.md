@@ -32,7 +32,7 @@ execute_vizion_report
 search_vizion_tree
 ```
 
-The tool depends on `Vizion\Api\IReportDataService` and exposes finished Vizion reports instead of constructing DataHawk query ASTs itself.
+The tool depends on `Base3\Vizion\Api\IReportDataService` and exposes finished Vizion reports instead of constructing DataHawk query ASTs itself.
 
 ## `VizionCanvasAgentTool`
 

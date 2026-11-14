@@ -1,28 +1,28 @@
 <?php declare(strict_types=1);
 
 /***********************************************************************
- * This file is part of MissionBay for BASE3 Framework.
+ * This file is part of MissionBayReporting for BASE3 Framework.
  *
- * MissionBay extends the BASE3 framework with a modular runtime
- * foundation for agent flows, reusable nodes, and dockable resources.
- * It provides declarative execution for AI-driven workflows.
+ * MissionBayReporting extends BASE3 with agent-oriented reporting tools.
+ * It integrates MissionBay conversations with DataHawk and Vizion.
+ * The tools provide query execution and visual report rendering.
  *
  * Developed by Daniel Dahme
  * Licensed under GPL-3.0
  * https://www.gnu.org/licenses/gpl-3.0.en.html
  *
- * https://base3.de/v/missionbay
- * https://github.com/ddbase3/MissionBay
+ * https://base3.de/v/missionbayreporting
+ * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting\Node\Data;
+namespace Base3\MissionBayReporting\Node\Data;
 
-use AssistantFoundation\Api\IAgentContext;
-use Base3\Api\IClassMap;
-use MissionBay\Agent\AgentNodePort;
-use MissionBay\Node\AbstractAgentNode;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IReportExporter;
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\MissionBay\Agent\AgentNodePort;
+use Base3\MissionBay\Node\AbstractAgentNode;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Api\IReportExporter;
 
 class DataHawkReportNode extends AbstractAgentNode {
 

@@ -15,19 +15,19 @@
  * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting\MissionBay;
+namespace Base3\MissionBayReporting\MissionBay;
 
-use AssistantFoundation\Api\IAgentContext;
-use Base3\Api\IOutputSchemaProvider;
-use Base3\Api\ISchemaProvider;
-use MissionBay\Api\IAgentConfigValueResolver;
-use MissionBay\Api\IAgentTool;
-use MissionBay\Resource\AbstractAgentResource;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IScopedQuerySchemaProvider;
-use ResourceFoundation\Dto\FieldMetadata;
-use ResourceFoundation\Dto\JoinMetadata;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\CoreFoundation\Api\IOutputSchemaProvider;
+use Base3\CoreFoundation\Api\ISchemaProvider;
+use Base3\MissionBay\Api\IAgentConfigValueResolver;
+use Base3\MissionBay\Api\IAgentTool;
+use Base3\MissionBay\Resource\AbstractAgentResource;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use Base3\ResourceFoundation\Dto\FieldMetadata;
+use Base3\ResourceFoundation\Dto\JoinMetadata;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 /**
  * DataHawkAgentTool

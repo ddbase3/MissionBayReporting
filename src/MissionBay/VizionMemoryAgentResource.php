@@ -15,15 +15,15 @@
  * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting\MissionBay;
+namespace Base3\MissionBayReporting\MissionBay;
 
-use AssistantFoundation\Api\IAgentMemory;
-use AssistantFoundation\Api\IAgentContext;
-use MissionBay\Api\IAgentConfigValueResolver;
-use MissionBay\Resource\AbstractAgentResource;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Dto\TableMetadata;
-use ResourceFoundation\Dto\FieldMetadata;
+use Base3\AssistantFoundation\Api\IAgentMemory;
+use Base3\AssistantFoundation\Api\IAgentContext;
+use Base3\MissionBay\Api\IAgentConfigValueResolver;
+use Base3\MissionBay\Resource\AbstractAgentResource;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Dto\TableMetadata;
+use Base3\ResourceFoundation\Dto\FieldMetadata;
 
 final class VizionMemoryAgentResource extends AbstractAgentResource implements IAgentMemory {
 

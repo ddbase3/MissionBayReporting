@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/MissionBayReporting
  **********************************************************************/
 
-namespace MissionBayReporting;
+namespace Base3\MissionBayReporting;
 
-use Base3\Api\IContainer;
-use Base3\Api\IPlugin;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IPlugin;
 
 class MissionBayReportingPlugin implements IPlugin {
 
