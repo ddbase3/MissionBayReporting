@@ -2,7 +2,7 @@
 	"manifestVersion": 1,
 	"name": "MissionBayReporting",
 	"namespace": "Base3\\MissionBayReporting",
-	"version": "4.6.0",
+	"version": "5.0.0",
 	"description": "MissionBay extension package for reporting and visualization with Vizion and ResourceFoundation.",
 	"license": "GPL-3.0-or-later",
 	"maintainers": [
@@ -14,10 +14,10 @@
 	],
 	"repository": "https://github.com/ddbase3/MissionBayReporting",
 	"dependencies": {
-		"CoreFoundation": ">=4.10.0",
-		"AssistantFoundation": ">=4.17.0",
-		"MissionBay": ">=4.38.0",
-		"ResourceFoundation": ">=4.5.0",
-		"Vizion": ">=4.7.0"
+		"CoreFoundation": ">=5.0.0",
+		"AssistantFoundation": ">=5.0.0",
+		"MissionBay": ">=5.0.0",
+		"ResourceFoundation": ">=5.0.0",
+		"Vizion": ">=5.0.0"
 	}
 }
